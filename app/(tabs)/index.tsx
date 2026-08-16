@@ -1,4 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { decode } from "base64-arraybuffer";
+import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
@@ -12,12 +14,14 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { supabase } from "../../lib/supabase";
 
 const START_DATE = new Date("2026-06-06");
 
 type PhotoMemory = {
   id: string;
-  uri: string;
+  image_url: string;
+  file_path: string;
   date: string;
   location: string;
 };
@@ -77,15 +81,17 @@ function PhotoTab() {
   }, []);
 
   async function loadPhotos() {
-    const savedPhotos = await AsyncStorage.getItem("photos");
+    const { data, error } = await supabase
+      .from("photos")
+      .select("*")
+      .order("created_at", { ascending: false });
 
-    if (savedPhotos) {
-      setPhotos(JSON.parse(savedPhotos));
+    if (error) {
+      console.log(error);
+      return;
     }
-  }
 
-  async function savePhotos(nextPhotos: PhotoMemory[]) {
-    await AsyncStorage.setItem("photos", JSON.stringify(nextPhotos));
+    setPhotos(data || []);
   }
 
   function formatPhotoDate(date: Date) {
@@ -103,8 +109,7 @@ function PhotoTab() {
       return formatPhotoDate(new Date());
     }
 
-    const dateText = String(photoDate).split(" ")[0].replaceAll(":", ".");
-    return dateText;
+    return String(photoDate).split(" ")[0].replaceAll(":", ".");
   }
 
   function getGpsNumber(value: any) {
@@ -127,8 +132,11 @@ function PhotoTab() {
       return "사진 위치 없음";
     }
 
-    const fixedLatitude = exif?.GPSLatitudeRef === "S" ? -latitude : latitude;
-    const fixedLongitude = exif?.GPSLongitudeRef === "W" ? -longitude : longitude;
+    const fixedLatitude =
+      exif?.GPSLatitudeRef === "S" ? -latitude : latitude;
+
+    const fixedLongitude =
+      exif?.GPSLongitudeRef === "W" ? -longitude : longitude;
 
     try {
       const addresses = await Location.reverseGeocodeAsync({
@@ -153,7 +161,8 @@ function PhotoTab() {
   }
 
   async function addPhoto() {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    const permission =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (permission.status !== "granted") {
       return;
@@ -170,69 +179,127 @@ function PhotoTab() {
     }
 
     const selectedPhoto = result.assets[0];
+
+    const base64 = await FileSystem.readAsStringAsync(
+      selectedPhoto.uri,
+      {
+        encoding: FileSystem.EncodingType.Base64,
+      }
+    );
+
+    const filePath = `${Date.now()}.jpg`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("photos")
+      .upload(filePath, decode(base64), {
+        contentType: "image/jpeg",
+      });
+
+    if (uploadError) {
+      console.log(uploadError);
+      return;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("photos")
+      .getPublicUrl(filePath);
+
     const photoDate = getPhotoDateFromExif(selectedPhoto.exif);
     const locationText = await getPhotoLocationText(selectedPhoto.exif);
 
-    const nextPhoto = {
-      id: String(Date.now()),
-      uri: selectedPhoto.uri,
-      date: photoDate,
-      location: locationText,
-    };
+    const { error: insertError } = await supabase
+      .from("photos")
+      .insert({
+        image_url: publicUrlData.publicUrl,
+        file_path: filePath,
+        date: photoDate,
+        location: locationText,
+      });
 
-    const nextPhotos = [nextPhoto, ...photos];
+    if (insertError) {
+      console.log(insertError);
+      return;
+    }
 
-    setPhotos(nextPhotos);
-    savePhotos(nextPhotos);
+    loadPhotos();
   }
-  function deletePhoto(photoId: string) {
-  const nextPhotos = photos.filter((photo) => photo.id !== photoId);
 
-  setPhotos(nextPhotos);
-  savePhotos(nextPhotos);
-  setSelectedPhoto(null);
-}
+  async function deletePhoto(photoId: string, filePath: string) {
+    await supabase.storage.from("photos").remove([filePath]);
+
+    await supabase
+      .from("photos")
+      .delete()
+      .eq("id", photoId);
+
+    setSelectedPhoto(null);
+    loadPhotos();
+  }
 
   return (
     <View style={styles.photoBox}>
       <Text style={styles.emptyTitle}>사진</Text>
-      <Text style={styles.emptyText}>함께한 순간을 사진으로 남겨봐요.</Text>
-      
 
-      <Pressable style={styles.addButton} onPress={addPhoto}>
-        <Text style={styles.addButtonText}>사진 추가하기</Text>
+      <Text style={styles.emptyText}>
+        함께한 순간을 사진으로 남겨봐요.
+      </Text>
+
+      <Pressable
+        style={styles.addButton}
+        onPress={addPhoto}
+      >
+        <Text style={styles.addButtonText}>
+          사진 추가하기
+        </Text>
       </Pressable>
 
-          <View style={styles.photoList}>
+      <View style={styles.photoList}>
         {photos.map((photo) => (
           <Pressable
             key={photo.id}
             style={styles.photoCard}
             onPress={() => setSelectedPhoto(photo)}
           >
-            <Image source={{ uri: photo.uri }} style={styles.photoImage} />
+            <Image
+              source={{ uri: photo.image_url }}
+              style={styles.photoImage}
+            />
 
             <View style={styles.photoInfo}>
-              <Text style={styles.photoText}>{photo.date}</Text>
-              <Text style={styles.photoText}>{photo.location}</Text>
+              <Text style={styles.photoText}>
+                {photo.date}
+              </Text>
+
+              <Text style={styles.photoText}>
+                {photo.location}
+              </Text>
             </View>
           </Pressable>
         ))}
       </View>
 
-      <Modal visible={selectedPhoto !== null} transparent animationType="fade">
+      <Modal
+        visible={selectedPhoto !== null}
+        transparent
+        animationType="fade"
+      >
         <View style={styles.modalBackground}>
           {selectedPhoto && (
             <View style={styles.modalContent}>
               <Image
-                source={{ uri: selectedPhoto.uri }}
+                source={{ uri: selectedPhoto.image_url }}
                 style={styles.fullPhoto}
                 resizeMode="contain"
               />
 
               <View style={styles.fullPhotoInfo}>
-                <Text style={styles.fullPhotoText}>{selectedPhoto.date}</Text>
-                <Text style={styles.fullPhotoText}>{selectedPhoto.location}</Text>
+                <Text style={styles.fullPhotoText}>
+                  {selectedPhoto.date}
+                </Text>
+
+                <Text style={styles.fullPhotoText}>
+                  {selectedPhoto.location}
+                </Text>
               </View>
 
               <View style={styles.modalActions}>
@@ -240,14 +307,23 @@ function PhotoTab() {
                   style={styles.closeButton}
                   onPress={() => setSelectedPhoto(null)}
                 >
-                  <Text style={styles.closeButtonText}>닫기</Text>
+                  <Text style={styles.closeButtonText}>
+                    닫기
+                  </Text>
                 </Pressable>
 
                 <Pressable
                   style={styles.photoDeleteButton}
-                  onPress={() => deletePhoto(selectedPhoto.id)}
+                  onPress={() =>
+                    deletePhoto(
+                      selectedPhoto.id,
+                      selectedPhoto.file_path
+                    )
+                  }
                 >
-                  <Text style={styles.photoDeleteButtonText}>삭제</Text>
+                  <Text style={styles.photoDeleteButtonText}>
+                    삭제
+                  </Text>
                 </Pressable>
               </View>
             </View>
@@ -257,16 +333,16 @@ function PhotoTab() {
     </View>
   );
 }
-
 function CalendarTab() {
   return (
     <View style={styles.emptyBox}>
       <Text style={styles.emptyTitle}>캘린더</Text>
-      <Text style={styles.emptyText}>생일과 기념일을 모아볼 공간이에요.</Text>
+      <Text style={styles.emptyText}>
+        생일과 기념일을 모아볼 공간이에요.
+      </Text>
     </View>
   );
 }
-
 function WishTab() {
   const [wishText, setWishText] = useState("");
   const [wishes, setWishes] = useState<Wish[]>([]);
@@ -288,15 +364,22 @@ function WishTab() {
   }
 
   function addWish() {
-    if (wishText.trim() === "") {
-      return;
-    }
-
-  const nextWishes = [...wishes, { text: wishText, done: false }];
-
-    setWishes(nextWishes);
-    setWishText("");
+  if (wishText.trim() === "") {
+    return;
   }
+
+  const nextWishes = [
+    ...wishes,
+    {
+      text: wishText,
+      done: false,
+    },
+  ];
+
+  setWishes(nextWishes);
+  saveWishes(nextWishes);
+  setWishText("");
+}
 
   function deleteWish(indexToDelete: number) {
   const nextWishes = wishes.filter((_, index) => index !== indexToDelete);

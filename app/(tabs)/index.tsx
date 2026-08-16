@@ -161,10 +161,14 @@ function PhotoTab() {
   }
 
   async function addPhoto() {
+  try {
     const permission =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
 
+    console.log("사진 권한:", permission.status);
+
     if (permission.status !== "granted") {
+      alert("사진 접근 권한이 허용되지 않았어요.");
       return;
     }
 
@@ -174,11 +178,20 @@ function PhotoTab() {
       exif: true,
     });
 
+    console.log("사진 선택 결과:", result);
+
     if (result.canceled) {
       return;
     }
 
     const selectedPhoto = result.assets[0];
+
+    if (!selectedPhoto?.uri) {
+      alert("사진을 불러오지 못했어요.");
+      return;
+    }
+
+    alert("사진 선택 완료");
 
     const base64 = await FileSystem.readAsStringAsync(
       selectedPhoto.uri,
@@ -187,22 +200,30 @@ function PhotoTab() {
       }
     );
 
+    console.log("Base64 변환 완료");
+
     const filePath = `${Date.now()}.jpg`;
 
     const { error: uploadError } = await supabase.storage
       .from("photos")
       .upload(filePath, decode(base64), {
         contentType: "image/jpeg",
+        upsert: false,
       });
 
     if (uploadError) {
-      console.log(uploadError);
+      console.log("Storage 업로드 오류:", uploadError);
+      alert(`Storage 업로드 실패\n${uploadError.message}`);
       return;
     }
+
+    alert("Storage 업로드 성공");
 
     const { data: publicUrlData } = supabase.storage
       .from("photos")
       .getPublicUrl(filePath);
+
+    console.log("Public URL:", publicUrlData.publicUrl);
 
     const photoDate = getPhotoDateFromExif(selectedPhoto.exif);
     const locationText = await getPhotoLocationText(selectedPhoto.exif);
@@ -217,12 +238,20 @@ function PhotoTab() {
       });
 
     if (insertError) {
-      console.log(insertError);
+      console.log("Database 저장 오류:", insertError);
+      alert(`Database 저장 실패\n${insertError.message}`);
       return;
     }
 
-    loadPhotos();
+    alert("사진 저장 완료!");
+
+    await loadPhotos();
+
+  } catch (error) {
+    console.log("사진 업로드 전체 오류:", error);
+    alert(`사진 업로드 오류\n${String(error)}`);
   }
+}
 
   async function deletePhoto(photoId: string, filePath: string) {
     await supabase.storage.from("photos").remove([filePath]);

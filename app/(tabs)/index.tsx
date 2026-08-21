@@ -74,7 +74,8 @@ function HomeTab() {
 
 function PhotoTab() {
   const [photos, setPhotos] = useState<PhotoMemory[]>([]);
-  const [selectedPhoto, setSelectedPhoto] = useState<PhotoMemory | null>(null);
+  const [selectedPhoto, setSelectedPhoto] =
+    useState<PhotoMemory | null>(null);
 
   useEffect(() => {
     loadPhotos();
@@ -87,9 +88,11 @@ function PhotoTab() {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.log(error);
+      console.log("사진 목록 불러오기 오류:", error);
       return;
     }
+
+    console.log("사진 목록:", data);
 
     setPhotos(data || []);
   }
@@ -103,13 +106,17 @@ function PhotoTab() {
   }
 
   function getPhotoDateFromExif(exif: any) {
-    const photoDate = exif?.DateTimeOriginal || exif?.DateTime;
+    const photoDate =
+      exif?.DateTimeOriginal ||
+      exif?.DateTime;
 
     if (!photoDate) {
       return formatPhotoDate(new Date());
     }
 
-    return String(photoDate).split(" ")[0].replaceAll(":", ".");
+    return String(photoDate)
+      .split(" ")[0]
+      .replaceAll(":", ".");
   }
 
   function getGpsNumber(value: any) {
@@ -117,157 +124,322 @@ function PhotoTab() {
       return value;
     }
 
-    if (Array.isArray(value)) {
-      return value[0] + value[1] / 60 + value[2] / 3600;
+    if (Array.isArray(value) && value.length >= 3) {
+      return (
+        value[0] +
+        value[1] / 60 +
+        value[2] / 3600
+      );
     }
 
     return null;
   }
 
   async function getPhotoLocationText(exif: any) {
-    const latitude = getGpsNumber(exif?.GPSLatitude);
-    const longitude = getGpsNumber(exif?.GPSLongitude);
+    const latitude =
+      getGpsNumber(exif?.GPSLatitude);
 
-    if (latitude === null || longitude === null) {
+    const longitude =
+      getGpsNumber(exif?.GPSLongitude);
+
+    if (
+      latitude === null ||
+      longitude === null
+    ) {
       return "사진 위치 없음";
     }
 
     const fixedLatitude =
-      exif?.GPSLatitudeRef === "S" ? -latitude : latitude;
+      exif?.GPSLatitudeRef === "S"
+        ? -latitude
+        : latitude;
 
     const fixedLongitude =
-      exif?.GPSLongitudeRef === "W" ? -longitude : longitude;
+      exif?.GPSLongitudeRef === "W"
+        ? -longitude
+        : longitude;
 
     try {
-      const addresses = await Location.reverseGeocodeAsync({
-        latitude: fixedLatitude,
-        longitude: fixedLongitude,
-      });
+      const addresses =
+        await Location.reverseGeocodeAsync({
+          latitude: fixedLatitude,
+          longitude: fixedLongitude,
+        });
 
       const address = addresses[0];
 
       if (!address) {
-        return `${fixedLatitude.toFixed(4)}, ${fixedLongitude.toFixed(4)}`;
+        return `${fixedLatitude.toFixed(
+          4
+        )}, ${fixedLongitude.toFixed(4)}`;
       }
 
       return (
-        [address.city, address.district].filter(Boolean).join(" ") ||
-        [address.region, address.country].filter(Boolean).join(" ") ||
+        [
+          address.city,
+          address.district,
+        ]
+          .filter(Boolean)
+          .join(" ") ||
+        [
+          address.region,
+          address.country,
+        ]
+          .filter(Boolean)
+          .join(" ") ||
         "사진 위치 있음"
       );
-    } catch {
-      return `${fixedLatitude.toFixed(4)}, ${fixedLongitude.toFixed(4)}`;
+    } catch (error) {
+      console.log(
+        "위치 변환 오류:",
+        error
+      );
+
+      return `${fixedLatitude.toFixed(
+        4
+      )}, ${fixedLongitude.toFixed(4)}`;
     }
   }
 
   async function addPhoto() {
-  try {
-    const permission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    try {
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    console.log("사진 권한:", permission.status);
-
-    if (permission.status !== "granted") {
-      alert("사진 접근 권한이 허용되지 않았어요.");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      exif: true,
-    });
-
-    console.log("사진 선택 결과:", result);
-
-    if (result.canceled) {
-      return;
-    }
-
-    const selectedPhoto = result.assets[0];
-
-    if (!selectedPhoto?.uri) {
-      alert("사진을 불러오지 못했어요.");
-      return;
-    }
-
-    alert("사진 선택 완료");
-
-    const base64 = await FileSystem.readAsStringAsync(
-      selectedPhoto.uri,
-      {
-        encoding: FileSystem.EncodingType.Base64,
+      if (permission.status !== "granted") {
+        console.log(
+          "사진 접근 권한 없음"
+        );
+        return;
       }
-    );
 
-    console.log("Base64 변환 완료");
+      const result =
+        await ImagePicker.launchImageLibraryAsync({
+          mediaTypes:
+            ImagePicker.MediaTypeOptions.Images,
+          quality: 0.8,
+          exif: true,
+        });
 
-    const filePath = `${Date.now()}.jpg`;
+      if (result.canceled) {
+        return;
+      }
 
-    const { error: uploadError } = await supabase.storage
-      .from("photos")
-      .upload(filePath, decode(base64), {
-        contentType: "image/jpeg",
-        upsert: false,
-      });
+      const selectedPhoto =
+        result.assets[0];
 
-    if (uploadError) {
-      console.log("Storage 업로드 오류:", uploadError);
-      alert(`Storage 업로드 실패\n${uploadError.message}`);
-      return;
+      console.log(
+        "사진 선택:",
+        selectedPhoto.uri
+      );
+
+      // -------------------------
+      // 사진 → Base64
+      // -------------------------
+
+      const base64 =
+        await FileSystem.readAsStringAsync(
+          selectedPhoto.uri,
+          {
+            encoding:
+              FileSystem.EncodingType.Base64,
+          }
+        );
+
+      console.log(
+        "Base64 길이:",
+        base64.length
+      );
+
+      // -------------------------
+      // Base64 → ArrayBuffer
+      // -------------------------
+
+      const arrayBuffer =
+        decode(base64);
+
+      console.log(
+        "ArrayBuffer 크기:",
+        arrayBuffer.byteLength
+      );
+
+      // -------------------------
+      // Storage 파일 경로
+      // -------------------------
+
+      const filePath =
+        `${Date.now()}.jpg`;
+
+      console.log(
+        "Storage 파일 경로:",
+        filePath
+      );
+
+      // -------------------------
+      // Supabase Storage 업로드
+      // -------------------------
+
+      const {
+        data: uploadData,
+        error: uploadError,
+      } =
+        await supabase.storage
+          .from("photos")
+          .upload(
+            filePath,
+            arrayBuffer,
+            {
+              contentType:
+                "image/jpeg",
+              upsert: false,
+            }
+          );
+
+      console.log(
+        "Storage 업로드 결과:",
+        uploadData
+      );
+
+      console.log(
+        "Storage 업로드 오류:",
+        uploadError
+      );
+
+      if (uploadError) {
+        return;
+      }
+
+      // -------------------------
+      // Public URL
+      // -------------------------
+
+      const {
+        data: publicUrlData,
+      } =
+        supabase.storage
+          .from("photos")
+          .getPublicUrl(
+            filePath
+          );
+
+      const imageUrl =
+        publicUrlData.publicUrl;
+
+      console.log(
+        "사진 URL:",
+        imageUrl
+      );
+
+      // -------------------------
+      // 사진 날짜
+      // -------------------------
+
+      const photoDate =
+        getPhotoDateFromExif(
+          selectedPhoto.exif
+        );
+
+      // -------------------------
+      // 사진 위치
+      // -------------------------
+
+      const locationText =
+        await getPhotoLocationText(
+          selectedPhoto.exif
+        );
+
+      // -------------------------
+      // Database 저장
+      // -------------------------
+
+      const {
+        error: insertError,
+      } =
+        await supabase
+          .from("photos")
+          .insert({
+            image_url: imageUrl,
+            file_path: filePath,
+            date: photoDate,
+            location: locationText,
+          });
+
+      if (insertError) {
+        console.log(
+          "Database 저장 오류:",
+          insertError
+        );
+        return;
+      }
+
+      console.log(
+        "사진 저장 완료"
+      );
+
+      // -------------------------
+      // 사진 목록 새로고침
+      // -------------------------
+
+      await loadPhotos();
+    } catch (error) {
+      console.log(
+        "사진 추가 전체 오류:",
+        error
+      );
     }
-
-    alert("Storage 업로드 성공");
-
-    const { data: publicUrlData } = supabase.storage
-      .from("photos")
-      .getPublicUrl(filePath);
-
-    console.log("Public URL:", publicUrlData.publicUrl);
-
-    const photoDate = getPhotoDateFromExif(selectedPhoto.exif);
-    const locationText = await getPhotoLocationText(selectedPhoto.exif);
-
-    const { error: insertError } = await supabase
-      .from("photos")
-      .insert({
-        image_url: publicUrlData.publicUrl,
-        file_path: filePath,
-        date: photoDate,
-        location: locationText,
-      });
-
-    if (insertError) {
-      console.log("Database 저장 오류:", insertError);
-      alert(`Database 저장 실패\n${insertError.message}`);
-      return;
-    }
-
-    alert("사진 저장 완료!");
-
-    await loadPhotos();
-
-  } catch (error) {
-    console.log("사진 업로드 전체 오류:", error);
-    alert(`사진 업로드 오류\n${String(error)}`);
   }
-}
 
-  async function deletePhoto(photoId: string, filePath: string) {
-    await supabase.storage.from("photos").remove([filePath]);
+  async function deletePhoto(
+    photoId: string,
+    filePath: string
+  ) {
+    try {
+      const {
+        error: storageError,
+      } =
+        await supabase.storage
+          .from("photos")
+          .remove([filePath]);
 
-    await supabase
-      .from("photos")
-      .delete()
-      .eq("id", photoId);
+      if (storageError) {
+        console.log(
+          "Storage 삭제 오류:",
+          storageError
+        );
+      }
 
-    setSelectedPhoto(null);
-    loadPhotos();
+      const {
+        error: databaseError,
+      } =
+        await supabase
+          .from("photos")
+          .delete()
+          .eq("id", photoId);
+
+      if (databaseError) {
+        console.log(
+          "Database 삭제 오류:",
+          databaseError
+        );
+        return;
+      }
+
+      setSelectedPhoto(null);
+
+      await loadPhotos();
+    } catch (error) {
+      console.log(
+        "사진 삭제 오류:",
+        error
+      );
+    }
   }
 
   return (
     <View style={styles.photoBox}>
-      <Text style={styles.emptyTitle}>사진</Text>
+      <Text style={styles.emptyTitle}>
+        사진
+      </Text>
 
       <Text style={styles.emptyText}>
         함께한 순간을 사진으로 남겨봐요.
@@ -283,66 +455,119 @@ function PhotoTab() {
       </Pressable>
 
       <View style={styles.photoList}>
-        {photos.map((photo) => (
-          <Pressable
-            key={photo.id}
-            style={styles.photoCard}
-            onPress={() => setSelectedPhoto(photo)}
-          >
-            <Image
-              source={{ uri: photo.image_url }}
-              style={styles.photoImage}
-            />
+        {photos.map((photo) => {
+          console.log(
+            "사진 URL:",
+            photo.image_url
+          );
 
-            <View style={styles.photoInfo}>
-              <Text style={styles.photoText}>
-                {photo.date}
-              </Text>
+          return (
+            <Pressable
+              key={photo.id}
+              style={styles.photoCard}
+              onPress={() =>
+                setSelectedPhoto(photo)
+              }
+            >
+              <Image
+                source={{
+                  uri: photo.image_url,
+                }}
+                style={styles.photoImage}
+              />
 
-              <Text style={styles.photoText}>
-                {photo.location}
-              </Text>
-            </View>
-          </Pressable>
-        ))}
+              <View style={styles.photoInfo}>
+                <Text
+                  style={styles.photoText}
+                >
+                  {photo.date}
+                </Text>
+
+                <Text
+                  style={styles.photoText}
+                >
+                  {photo.location}
+                </Text>
+              </View>
+            </Pressable>
+          );
+        })}
       </View>
 
       <Modal
-        visible={selectedPhoto !== null}
+        visible={
+          selectedPhoto !== null
+        }
         transparent
         animationType="fade"
       >
-        <View style={styles.modalBackground}>
+        <View
+          style={
+            styles.modalBackground
+          }
+        >
           {selectedPhoto && (
-            <View style={styles.modalContent}>
+            <View
+              style={
+                styles.modalContent
+              }
+            >
               <Image
-                source={{ uri: selectedPhoto.image_url }}
+                source={{
+                  uri: selectedPhoto.image_url,
+                }}
                 style={styles.fullPhoto}
                 resizeMode="contain"
               />
 
-              <View style={styles.fullPhotoInfo}>
-                <Text style={styles.fullPhotoText}>
+              <View
+                style={
+                  styles.fullPhotoInfo
+                }
+              >
+                <Text
+                  style={
+                    styles.fullPhotoText
+                  }
+                >
                   {selectedPhoto.date}
                 </Text>
 
-                <Text style={styles.fullPhotoText}>
+                <Text
+                  style={
+                    styles.fullPhotoText
+                  }
+                >
                   {selectedPhoto.location}
                 </Text>
               </View>
 
-              <View style={styles.modalActions}>
+              <View
+                style={
+                  styles.modalActions
+                }
+              >
                 <Pressable
-                  style={styles.closeButton}
-                  onPress={() => setSelectedPhoto(null)}
+                  style={
+                    styles.closeButton
+                  }
+                  onPress={() =>
+                    setSelectedPhoto(null)
+                  }
                 >
-                  <Text style={styles.closeButtonText}>
+                  <Text
+                    style={
+                      styles.closeButtonText
+                    }
+                  >
                     닫기
                   </Text>
                 </Pressable>
 
                 <Pressable
-                  style={styles.photoDeleteButton}
+                  style={
+                    styles.photoDeleteButton
+                  }
                   onPress={() =>
                     deletePhoto(
                       selectedPhoto.id,
@@ -350,7 +575,11 @@ function PhotoTab() {
                     )
                   }
                 >
-                  <Text style={styles.photoDeleteButtonText}>
+                  <Text
+                    style={
+                      styles.photoDeleteButtonText
+                    }
+                  >
                     삭제
                   </Text>
                 </Pressable>

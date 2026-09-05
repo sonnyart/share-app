@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import {
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -227,6 +228,11 @@ function PhotoTab() {
 
       const selectedPhoto =
         result.assets[0];
+
+        console.log("플랫폼:", Platform.OS);
+        console.log("사진 URI:", selectedPhoto.uri);
+        console.log("사진 크기:", selectedPhoto.fileSize);
+        console.log("MIME:", selectedPhoto.mimeType);  
 
       console.log(
         "사진 선택:",

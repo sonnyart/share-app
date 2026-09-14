@@ -5,6 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { useEffect, useState } from "react";
 import {
+  Alert,
   Image,
   Modal,
   Platform,
@@ -78,23 +79,31 @@ function PhotoTab() {
   const [selectedPhoto, setSelectedPhoto] =
     useState<PhotoMemory | null>(null);
 
-  const [debugText, setDebugText] = useState("");
 
-  async function loadPhotos() {
-    const { data, error } = await supabase
-      .from("photos")
-      .select("*")
-      .order("created_at", { ascending: false });
+async function loadPhotos() {
+  const { data, error } = await supabase
+    .from("photos")
+    .select("*")
+    .order("created_at", { ascending: false });
 
-    if (error) {
-      console.log("사진 목록 불러오기 오류:", error);
-      return;
-    }
+  console.log("사진 목록:", data);
+  console.log("사진 목록 오류:", error);
 
-    console.log("사진 목록:", data);
-
-    setPhotos(data || []);
+  if (error) {
+    Alert.alert(
+      "사진 불러오기 오류",
+      error.message
+    );
+    return;
   }
+
+  Alert.alert(
+    "사진 불러오기",
+    `사진 개수: ${data?.length ?? 0}`
+  );
+
+  setPhotos(data || []);
+}
 
   function formatPhotoDate(date: Date) {
     const year = date.getFullYear();
@@ -136,9 +145,7 @@ function PhotoTab() {
 
 async function getPhotoLocationText(exif: any) {
   console.log("===== 위치 정보 확인 =====");
-  setDebugText(
-  `EXIF: ${JSON.stringify(exif, null, 2)}`
-);
+  
   console.log("EXIF 전체:", exif);
   console.log(
     "GPSLatitude:",
@@ -163,13 +170,6 @@ async function getPhotoLocationText(exif: any) {
 
   const longitude =
     getGpsNumber(exif?.GPSLongitude);
-
-    setDebugText(
-  "GPS Latitude: " +
-    JSON.stringify(exif?.GPSLatitude) +
-    "\nGPS Longitude: " +
-    JSON.stringify(exif?.GPSLongitude)
-);
 
   console.log(
     "변환된 Latitude:",

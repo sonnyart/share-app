@@ -338,6 +338,10 @@ function PhotoTab() {
 
       // -------------------------
       // 사진 날짜
+      console.log("EXIF 전체:", selectedPhoto.exif);
+      console.log("GPS Latitude:", selectedPhoto.exif?.GPSLatitude);
+      console.log("GPS Longitude:", selectedPhoto.exif?.GPSLongitude);
+
       // -------------------------
 
       const photoDate =

@@ -78,9 +78,7 @@ function PhotoTab() {
   const [selectedPhoto, setSelectedPhoto] =
     useState<PhotoMemory | null>(null);
 
-  useEffect(() => {
-    loadPhotos();
-  }, []);
+  const [debugText, setDebugText] = useState("");
 
   async function loadPhotos() {
     const { data, error } = await supabase
@@ -136,71 +134,129 @@ function PhotoTab() {
     return null;
   }
 
-  async function getPhotoLocationText(exif: any) {
-    const latitude =
-      getGpsNumber(exif?.GPSLatitude);
+async function getPhotoLocationText(exif: any) {
+  console.log("===== 위치 정보 확인 =====");
+  setDebugText(
+  `EXIF: ${JSON.stringify(exif, null, 2)}`
+);
+  console.log("EXIF 전체:", exif);
+  console.log(
+    "GPSLatitude:",
+    exif?.GPSLatitude
+  );
+  console.log(
+    "GPSLongitude:",
+    exif?.GPSLongitude
+  );
 
-    const longitude =
-      getGpsNumber(exif?.GPSLongitude);
+  console.log(
+    "GPSLatitudeRef:",
+    exif?.GPSLatitudeRef
+  );
+  console.log(
+    "GPSLongitudeRef:",
+    exif?.GPSLongitudeRef
+  );
 
-    if (
-      latitude === null ||
-      longitude === null
-    ) {
-      return "사진 위치 없음";
-    }
+  const latitude =
+    getGpsNumber(exif?.GPSLatitude);
 
-    const fixedLatitude =
-      exif?.GPSLatitudeRef === "S"
-        ? -latitude
-        : latitude;
+  const longitude =
+    getGpsNumber(exif?.GPSLongitude);
 
-    const fixedLongitude =
-      exif?.GPSLongitudeRef === "W"
-        ? -longitude
-        : longitude;
+    setDebugText(
+  "GPS Latitude: " +
+    JSON.stringify(exif?.GPSLatitude) +
+    "\nGPS Longitude: " +
+    JSON.stringify(exif?.GPSLongitude)
+);
 
-    try {
-      const addresses =
-        await Location.reverseGeocodeAsync({
-          latitude: fixedLatitude,
-          longitude: fixedLongitude,
-        });
+  console.log(
+    "변환된 Latitude:",
+    latitude
+  );
+  console.log(
+    "변환된 Longitude:",
+    longitude
+  );
 
-      const address = addresses[0];
+  if (
+    latitude === null ||
+    longitude === null
+  ) {
+    console.log("❌ GPS 정보 없음");
+    return "사진 위치 없음";
+  }
 
-      if (!address) {
-        return `${fixedLatitude.toFixed(
-          4
-        )}, ${fixedLongitude.toFixed(4)}`;
-      }
+  const fixedLatitude =
+    exif?.GPSLatitudeRef === "S"
+      ? -latitude
+      : latitude;
 
-      return (
-        [
-          address.city,
-          address.district,
-        ]
-          .filter(Boolean)
-          .join(" ") ||
-        [
-          address.region,
-          address.country,
-        ]
-          .filter(Boolean)
-          .join(" ") ||
-        "사진 위치 있음"
-      );
-    } catch (error) {
-      console.log(
-        "위치 변환 오류:",
-        error
-      );
+  const fixedLongitude =
+    exif?.GPSLongitudeRef === "W"
+      ? -longitude
+      : longitude;
 
+  console.log(
+    "최종 좌표:",
+    fixedLatitude,
+    fixedLongitude
+  );
+
+  try {
+    const addresses =
+      await Location.reverseGeocodeAsync({
+        latitude: fixedLatitude,
+        longitude: fixedLongitude,
+      });
+
+    console.log(
+      "Reverse Geocode 결과:",
+      addresses
+    );
+
+    const address = addresses[0];
+
+    if (!address) {
       return `${fixedLatitude.toFixed(
         4
       )}, ${fixedLongitude.toFixed(4)}`;
     }
+
+    const locationText =
+      [
+        address.city,
+        address.district,
+      ]
+        .filter(Boolean)
+        .join(" ") ||
+      [
+        address.region,
+        address.country,
+      ]
+        .filter(Boolean)
+        .join(" ") ||
+      "사진 위치 있음";
+
+    console.log(
+      "최종 위치:",
+      locationText
+    );
+
+    return locationText;
+
+  } catch (error) {
+    console.log(
+      "❌ 위치 변환 오류:",
+      error
+    );
+
+    return `${fixedLatitude.toFixed(
+      4
+    )}, ${fixedLongitude.toFixed(4)}`;
   }
+}
 
   async function addPhoto() {
     try {
@@ -232,7 +288,8 @@ function PhotoTab() {
         console.log("플랫폼:", Platform.OS);
         console.log("사진 URI:", selectedPhoto.uri);
         console.log("사진 크기:", selectedPhoto.fileSize);
-        console.log("MIME:", selectedPhoto.mimeType);  
+        console.log("MIME:", selectedPhoto.mimeType); 
+        console.log("선택한 사진 EXIF:", selectedPhoto.exif); 
 
       console.log(
         "사진 선택:",
@@ -341,7 +398,7 @@ function PhotoTab() {
       console.log("EXIF 전체:", selectedPhoto.exif);
       console.log("GPS Latitude:", selectedPhoto.exif?.GPSLatitude);
       console.log("GPS Longitude:", selectedPhoto.exif?.GPSLongitude);
-
+      
       // -------------------------
 
       const photoDate =
@@ -739,11 +796,21 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
 
+        <View
+         style={{
+            padding: 10,
+            margin: 10,
+            backgroundColor: "#eee",
+  }}
+>
+</View>
+
         <Pressable style={styles.tabButton} onPress={() => setSelectedTab("photo")}>
           <Text style={selectedTab === "photo" ? styles.tabTextActive : styles.tabText}>
             사진
           </Text>
         </Pressable>
+        
 
         <Pressable style={styles.tabButton} onPress={() => setSelectedTab("calendar")}>
           <Text

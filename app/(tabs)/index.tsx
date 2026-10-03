@@ -79,6 +79,9 @@ function PhotoTab() {
   const [selectedPhoto, setSelectedPhoto] =
     useState<PhotoMemory | null>(null);
 
+useEffect(() => {
+    loadPhotos();
+  }, []);
 
 async function loadPhotos() {
   const { data, error } = await supabase

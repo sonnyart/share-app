@@ -305,12 +305,14 @@ const styles = StyleSheet.create({
   },
   column: {
     flex: 1,
+    height: "100%",
     width: "100%",
     maxWidth: MAX_WIDTH,
     alignSelf: "center",
   },
   list: {
     flex: 1,
+    height: "100%",
   },
   hero: {
     alignItems: "flex-start",

@@ -2,16 +2,13 @@ import "react-native-url-polyfill/auto";
 
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
-console.log("Supabase URL:", supabaseUrl);
-console.log(
-  "Supabase Key:",
-  supabaseKey ? "KEY EXISTS" : "KEY MISSING"
-);
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    "Supabase 환경변수가 없습니다. .env 파일에 EXPO_PUBLIC_SUPABASE_URL 과 EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY 를 설정해주세요."
+  );
+}
 
-export const supabase = createClient(
-  supabaseUrl,
-  supabaseKey
-);
+export const supabase = createClient(supabaseUrl, supabaseKey);

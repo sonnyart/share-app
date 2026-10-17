@@ -1,1137 +1,369 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { decode } from "base64-arraybuffer";
-import * as FileSystem from "expo-file-system/legacy";
-import * as ImagePicker from "expo-image-picker";
-import * as Location from "expo-location";
-import { useEffect, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
-  Alert,
-  Image,
+  ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
-
-const START_DATE = new Date("2026-06-06");
-
-type PhotoMemory = {
-  id: string;
-  image_url: string;
-  file_path: string;
-  date: string;
-  location: string;
-};
-
-type Wish = {
-  text: string;
-  done: boolean;
-};
-
-const ANNIVERSARIES = [
-  { label: "1주년", days: 365 },
-];
-
-function getDaysTogether() {
-  const today = new Date();
-  const startTime = START_DATE.getTime();
-  const todayTime = today.getTime();
-  const diffTime = todayTime - startTime;
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-  return diffDays + 1;
-}
-
-function getDateAfterDays(days: number) {
-  const date = new Date(START_DATE);
-  date.setDate(START_DATE.getDate() + days - 1);
-
-  return date;
-}
-
-function formatDate(date: Date) {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-
-  return `${year}.${month}.${day}`;
-}
-
-function HomeTab() {
-  const daysTogether = getDaysTogether();
-
-  return (
-    <View style={styles.homeBox}>
-      <Text style={styles.smallText}>우리만의 기록</Text>
-      <Text style={styles.label}>오늘은 만난 지</Text>
-      <Text style={styles.dayText}>+{daysTogether}일</Text>
-    </View>
-  );
-}
-
-function PhotoTab() {
-  const [photos, setPhotos] = useState<PhotoMemory[]>([]);
-  const [selectedPhoto, setSelectedPhoto] =
-    useState<PhotoMemory | null>(null);
-
-useEffect(() => {
-    loadPhotos();
-  }, []);
-
-async function loadPhotos() {
-  const { data, error } = await supabase
-    .from("photos")
-    .select("*")
-    .order("created_at", { ascending: false });
-
-  console.log("사진 목록:", data);
-  console.log("사진 목록 오류:", error);
-
-  if (error) {
-    Alert.alert(
-      "사진 불러오기 오류",
-      error.message
-    );
-    return;
-  }
-
-  Alert.alert(
-    "사진 불러오기",
-    `사진 개수: ${data?.length ?? 0}`
-  );
-
-  setPhotos(data || []);
-}
-
-  function formatPhotoDate(date: Date) {
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-
-    return `${year}.${month}.${day}`;
-  }
-
-  function getPhotoDateFromExif(exif: any) {
-    const photoDate =
-      exif?.DateTimeOriginal ||
-      exif?.DateTime;
-
-    if (!photoDate) {
-      return formatPhotoDate(new Date());
-    }
-
-    return String(photoDate)
-      .split(" ")[0]
-      .replaceAll(":", ".");
-  }
-
-  function getGpsNumber(value: any) {
-    if (typeof value === "number") {
-      return value;
-    }
-
-    if (Array.isArray(value) && value.length >= 3) {
-      return (
-        value[0] +
-        value[1] / 60 +
-        value[2] / 3600
-      );
-    }
-
-    return null;
-  }
-
-async function getPhotoLocationText(exif: any) {
-  console.log("===== 위치 정보 확인 =====");
-  
-  console.log("EXIF 전체:", exif);
-  console.log(
-    "GPSLatitude:",
-    exif?.GPSLatitude
-  );
-  console.log(
-    "GPSLongitude:",
-    exif?.GPSLongitude
-  );
-
-  console.log(
-    "GPSLatitudeRef:",
-    exif?.GPSLatitudeRef
-  );
-  console.log(
-    "GPSLongitudeRef:",
-    exif?.GPSLongitudeRef
-  );
-
-  const latitude =
-    getGpsNumber(exif?.GPSLatitude);
-
-  const longitude =
-    getGpsNumber(exif?.GPSLongitude);
-
-  console.log(
-    "변환된 Latitude:",
-    latitude
-  );
-  console.log(
-    "변환된 Longitude:",
-    longitude
-  );
-
-  if (
-    latitude === null ||
-    longitude === null
-  ) {
-    console.log("❌ GPS 정보 없음");
-    return "사진 위치 없음";
-  }
-
-  const fixedLatitude =
-    exif?.GPSLatitudeRef === "S"
-      ? -latitude
-      : latitude;
-
-  const fixedLongitude =
-    exif?.GPSLongitudeRef === "W"
-      ? -longitude
-      : longitude;
-
-  console.log(
-    "최종 좌표:",
-    fixedLatitude,
-    fixedLongitude
-  );
-
-  try {
-    const addresses =
-      await Location.reverseGeocodeAsync({
-        latitude: fixedLatitude,
-        longitude: fixedLongitude,
-      });
-
-    console.log(
-      "Reverse Geocode 결과:",
-      addresses
-    );
-
-    const address = addresses[0];
-
-    if (!address) {
-      return `${fixedLatitude.toFixed(
-        4
-      )}, ${fixedLongitude.toFixed(4)}`;
-    }
-
-    const locationText =
-      [
-        address.city,
-        address.district,
-      ]
-        .filter(Boolean)
-        .join(" ") ||
-      [
-        address.region,
-        address.country,
-      ]
-        .filter(Boolean)
-        .join(" ") ||
-      "사진 위치 있음";
-
-    console.log(
-      "최종 위치:",
-      locationText
-    );
-
-    return locationText;
-
-  } catch (error) {
-    console.log(
-      "❌ 위치 변환 오류:",
-      error
-    );
-
-    return `${fixedLatitude.toFixed(
-      4
-    )}, ${fixedLongitude.toFixed(4)}`;
-  }
-}
-
-  async function addPhoto() {
-    try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (permission.status !== "granted") {
-        console.log(
-          "사진 접근 권한 없음"
-        );
-        return;
-      }
-
-      const result =
-        await ImagePicker.launchImageLibraryAsync({
-          mediaTypes:
-            ImagePicker.MediaTypeOptions.Images,
-          quality: 0.8,
-          exif: true,
-        });
-
-      if (result.canceled) {
-        return;
-      }
-
-      const selectedPhoto =
-        result.assets[0];
-
-        console.log("플랫폼:", Platform.OS);
-        console.log("사진 URI:", selectedPhoto.uri);
-        console.log("사진 크기:", selectedPhoto.fileSize);
-        console.log("MIME:", selectedPhoto.mimeType); 
-        console.log("선택한 사진 EXIF:", selectedPhoto.exif); 
-
-      console.log(
-        "사진 선택:",
-        selectedPhoto.uri
-      );
-
-      // -------------------------
-      // 사진 → Base64
-      // -------------------------
-
-      const base64 =
-        await FileSystem.readAsStringAsync(
-          selectedPhoto.uri,
-          {
-            encoding:
-              FileSystem.EncodingType.Base64,
-          }
-        );
-
-      console.log(
-        "Base64 길이:",
-        base64.length
-      );
-
-      // -------------------------
-      // Base64 → ArrayBuffer
-      // -------------------------
-
-      const arrayBuffer =
-        decode(base64);
-
-      console.log(
-        "ArrayBuffer 크기:",
-        arrayBuffer.byteLength
-      );
-
-      // -------------------------
-      // Storage 파일 경로
-      // -------------------------
-
-      const filePath =
-        `${Date.now()}.jpg`;
-
-      console.log(
-        "Storage 파일 경로:",
-        filePath
-      );
-
-      // -------------------------
-      // Supabase Storage 업로드
-      // -------------------------
-
-      const {
-        data: uploadData,
-        error: uploadError,
-      } =
-        await supabase.storage
-          .from("photos")
-          .upload(
-            filePath,
-            arrayBuffer,
-            {
-              contentType:
-                "image/jpeg",
-              upsert: false,
-            }
-          );
-
-      console.log(
-        "Storage 업로드 결과:",
-        uploadData
-      );
-
-      console.log(
-        "Storage 업로드 오류:",
-        uploadError
-      );
-
-      if (uploadError) {
-        return;
-      }
-
-      // -------------------------
-      // Public URL
-      // -------------------------
-
-      const {
-        data: publicUrlData,
-      } =
-        supabase.storage
-          .from("photos")
-          .getPublicUrl(
-            filePath
-          );
-
-      const imageUrl =
-        publicUrlData.publicUrl;
-
-      console.log(
-        "사진 URL:",
-        imageUrl
-      );
-
-      // -------------------------
-      // 사진 날짜
-      console.log("EXIF 전체:", selectedPhoto.exif);
-      console.log("GPS Latitude:", selectedPhoto.exif?.GPSLatitude);
-      console.log("GPS Longitude:", selectedPhoto.exif?.GPSLongitude);
-      
-      // -------------------------
-
-      const photoDate =
-        getPhotoDateFromExif(
-          selectedPhoto.exif
-        );
-
-      // -------------------------
-      // 사진 위치
-      // -------------------------
-
-      const locationText =
-        await getPhotoLocationText(
-          selectedPhoto.exif
-        );
-
-      // -------------------------
-      // Database 저장
-      // -------------------------
-
-      const {
-        error: insertError,
-      } =
-        await supabase
-          .from("photos")
-          .insert({
-            image_url: imageUrl,
-            file_path: filePath,
-            date: photoDate,
-            location: locationText,
-          });
-
-      if (insertError) {
-        console.log(
-          "Database 저장 오류:",
-          insertError
-        );
-        return;
-      }
-
-      console.log(
-        "사진 저장 완료"
-      );
-
-      // -------------------------
-      // 사진 목록 새로고침
-      // -------------------------
-
-      await loadPhotos();
-    } catch (error) {
-      console.log(
-        "사진 추가 전체 오류:",
-        error
-      );
-    }
-  }
-
-  async function deletePhoto(
-    photoId: string,
-    filePath: string
-  ) {
-    try {
-      const {
-        error: storageError,
-      } =
-        await supabase.storage
-          .from("photos")
-          .remove([filePath]);
-
-      if (storageError) {
-        console.log(
-          "Storage 삭제 오류:",
-          storageError
-        );
-      }
-
-      const {
-        error: databaseError,
-      } =
-        await supabase
-          .from("photos")
-          .delete()
-          .eq("id", photoId);
-
-      if (databaseError) {
-        console.log(
-          "Database 삭제 오류:",
-          databaseError
-        );
-        return;
-      }
-
-      setSelectedPhoto(null);
-
-      await loadPhotos();
-    } catch (error) {
-      console.log(
-        "사진 삭제 오류:",
-        error
-      );
-    }
-  }
-
-  return (
-    <View style={styles.photoBox}>
-      <Text style={styles.emptyTitle}>
-        사진
-      </Text>
-
-      <Text style={styles.emptyText}>
-        함께한 순간을 사진으로 남겨봐요.
-      </Text>
-
-      <Pressable
-        style={styles.addButton}
-        onPress={addPhoto}
-      >
-        <Text style={styles.addButtonText}>
-          사진 추가하기
-        </Text>
-      </Pressable>
-
-      <View style={styles.photoList}>
-        {photos.map((photo) => {
-          console.log(
-            "사진 URL:",
-            photo.image_url
-          );
-
-          return (
-            <Pressable
-              key={photo.id}
-              style={styles.photoCard}
-              onPress={() =>
-                setSelectedPhoto(photo)
-              }
-            >
-              <Image
-                source={{
-                  uri: photo.image_url,
-                }}
-                style={styles.photoImage}
-              />
-
-              <View style={styles.photoInfo}>
-                <Text
-                  style={styles.photoText}
-                >
-                  {photo.date}
-                </Text>
-
-                <Text
-                  style={styles.photoText}
-                >
-                  {photo.location}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <Modal
-        visible={
-          selectedPhoto !== null
-        }
-        transparent
-        animationType="fade"
-      >
-        <View
-          style={
-            styles.modalBackground
-          }
-        >
-          {selectedPhoto && (
-            <View
-              style={
-                styles.modalContent
-              }
-            >
-              <Image
-                source={{
-                  uri: selectedPhoto.image_url,
-                }}
-                style={styles.fullPhoto}
-                resizeMode="contain"
-              />
-
-              <View
-                style={
-                  styles.fullPhotoInfo
-                }
-              >
-                <Text
-                  style={
-                    styles.fullPhotoText
-                  }
-                >
-                  {selectedPhoto.date}
-                </Text>
-
-                <Text
-                  style={
-                    styles.fullPhotoText
-                  }
-                >
-                  {selectedPhoto.location}
-                </Text>
-              </View>
-
-              <View
-                style={
-                  styles.modalActions
-                }
-              >
-                <Pressable
-                  style={
-                    styles.closeButton
-                  }
-                  onPress={() =>
-                    setSelectedPhoto(null)
-                  }
-                >
-                  <Text
-                    style={
-                      styles.closeButtonText
-                    }
-                  >
-                    닫기
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={
-                    styles.photoDeleteButton
-                  }
-                  onPress={() =>
-                    deletePhoto(
-                      selectedPhoto.id,
-                      selectedPhoto.file_path
-                    )
-                  }
-                >
-                  <Text
-                    style={
-                      styles.photoDeleteButtonText
-                    }
-                  >
-                    삭제
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-        </View>
-      </Modal>
-    </View>
-  );
-}
-function CalendarTab() {
-  return (
-    <View style={styles.emptyBox}>
-      <Text style={styles.emptyTitle}>캘린더</Text>
-      <Text style={styles.emptyText}>
-        생일과 기념일을 모아볼 공간이에요.
-      </Text>
-    </View>
-  );
-}
-function WishTab() {
-  const [wishText, setWishText] = useState("");
-  const [wishes, setWishes] = useState<Wish[]>([]);
-
-  useEffect(() => {
-    loadWishes();
-  }, []);
-
-  async function loadWishes() {
-    const savedWishes = await AsyncStorage.getItem("wishes");
-
-    if (savedWishes) {
-      setWishes(JSON.parse(savedWishes));
-    }
-  }
-
-  async function saveWishes(nextWishes: Wish[]) {
-    await AsyncStorage.setItem("wishes", JSON.stringify(nextWishes));
-  }
-
-  function addWish() {
-  if (wishText.trim() === "") {
-    return;
-  }
-
-  const nextWishes = [
-    ...wishes,
-    {
-      text: wishText,
-      done: false,
-    },
-  ];
-
-  setWishes(nextWishes);
-  saveWishes(nextWishes);
-  setWishText("");
-}
-
-  function deleteWish(indexToDelete: number) {
-  const nextWishes = wishes.filter((_, index) => index !== indexToDelete);
-
-  setWishes(nextWishes);
-  saveWishes(nextWishes);
-}
-
-function toggleWish(indexToToggle: number) {
-  const nextWishes = wishes.map((wish, index) => {
-    if (index === indexToToggle) {
-      return { ...wish, done: !wish.done };
-    }
-
-    return wish;
-  });
-
-  setWishes(nextWishes);
-  saveWishes(nextWishes);
-}
-
-  return (
-    <View style={styles.wishBox}>
-      <Text style={styles.emptyTitle}>위시 리스트</Text>
-      <Text style={styles.emptyText}>가고 싶은 곳과 하고 싶은 일을 적어봐요.</Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="예: 제주도 여행 가기"
-        value={wishText}
-        onChangeText={setWishText}
-      />
-
-      <Pressable style={styles.addButton} onPress={addWish}>
-        <Text style={styles.addButtonText}>추가하기</Text>
-      </Pressable>
-
-    <View style={styles.wishList}>
-  {wishes.map((wish, index) => (
-    <View key={index} style={styles.wishItem}>
-      <Text
-        style={wish.done ? styles.wishItemTextDone : styles.wishItemText}
-      >
-        {wish.text}
-      </Text>
-
-      <View style={styles.wishActions}>
-        <Pressable
-          style={styles.doneButton}
-          onPress={() => toggleWish(index)}
-        >
-          <Text style={styles.doneButtonText}>
-            {wish.done ? "되돌리기" : "완료"}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.deleteButton}
-          onPress={() => deleteWish(index)}
-        >
-          <Text style={styles.deleteButtonText}>삭제</Text>
-        </Pressable>
-      </View>
-    </View>
-  ))}
-</View>
-      
-      </View>
-    
-  );
-}
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { palette } from "@/constants/theme";
+import { daysSince, formatKoreanDate, isValidDateStr, todayStr } from "@/lib/dates";
+import { getStartDate, setStartDate } from "@/lib/storage";
 
 export default function HomeScreen() {
-  const [selectedTab, setSelectedTab] = useState("home");
+  const [startDate, setStartDateState] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pickerVisible, setPickerVisible] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      (async () => {
+        const saved = await getStartDate();
+        if (active) {
+          setStartDateState(saved);
+          setLoading(false);
+        }
+      })();
+
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.screen} edges={["top"]}>
+        <View style={styles.center}>
+          <ActivityIndicator color={palette.accent} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {selectedTab === "home" && <HomeTab />}
-        {selectedTab === "photo" && <PhotoTab />}
-        {selectedTab === "calendar" && <CalendarTab />}
-        {selectedTab === "wish" && <WishTab />}
-      </ScrollView>
-
-      <View style={styles.tabBar}>
-        <Pressable style={styles.tabButton} onPress={() => setSelectedTab("home")}>
-          <Text style={selectedTab === "home" ? styles.tabTextActive : styles.tabText}>
-            홈
-          </Text>
-        </Pressable>
-
-        <View
-         style={{
-            padding: 10,
-            margin: 10,
-            backgroundColor: "#eee",
-  }}
->
-</View>
-
-        <Pressable style={styles.tabButton} onPress={() => setSelectedTab("photo")}>
-          <Text style={selectedTab === "photo" ? styles.tabTextActive : styles.tabText}>
-            사진
-          </Text>
-        </Pressable>
-        
-
-        <Pressable style={styles.tabButton} onPress={() => setSelectedTab("calendar")}>
-          <Text
-            style={selectedTab === "calendar" ? styles.tabTextActive : styles.tabText}
-          >
-            캘린더
-          </Text>
-        </Pressable>
-
-        <Pressable style={styles.tabButton} onPress={() => setSelectedTab("wish")}>
-          <Text style={selectedTab === "wish" ? styles.tabTextActive : styles.tabText}>
-            위시
-          </Text>
-        </Pressable>
+    <SafeAreaView style={styles.screen} edges={["top"]}>
+      <View style={styles.content}>
+        {startDate ? (
+          <DdayView
+            startDate={startDate}
+            onEdit={() => setPickerVisible(true)}
+          />
+        ) : (
+          <FirstRunView onAdd={() => setPickerVisible(true)} />
+        )}
       </View>
+
+      <DatePickerModal
+        visible={pickerVisible}
+        initialValue={startDate ?? undefined}
+        onClose={() => setPickerVisible(false)}
+        onSave={async (date) => {
+          await setStartDate(date);
+          setStartDateState(date);
+          setPickerVisible(false);
+        }}
+      />
+    </SafeAreaView>
+  );
+}
+
+function DdayView({
+  startDate,
+  onEdit,
+}: {
+  startDate: string;
+  onEdit: () => void;
+}) {
+  const days = daysSince(startDate);
+
+  return (
+    <View style={styles.ddayWrap}>
+      <Text style={styles.smallText}>우리만의 기록</Text>
+      <Text style={styles.label}>오늘은 만난 지</Text>
+      <Text style={styles.dayText}>+{days}일</Text>
+
+      <Pressable style={styles.startDateRow} onPress={onEdit}>
+        <Text style={styles.startDateText}>
+          시작일 {formatKoreanDate(startDate)}
+        </Text>
+        <Ionicons name="pencil" size={14} color={palette.accent} />
+      </Pressable>
     </View>
+  );
+}
+
+function FirstRunView({ onAdd }: { onAdd: () => void }) {
+  return (
+    <View style={styles.ddayWrap}>
+      <Text style={styles.smallText}>우리만의 기록</Text>
+      <Text style={styles.firstRunTitle}>우리의 시작 날짜를 정해볼까요?</Text>
+      <Text style={styles.firstRunText}>
+        시작일을 입력하면 매일 만난 날 수를 세어드려요.
+      </Text>
+
+      <Pressable style={styles.bigAddButton} onPress={onAdd}>
+        <Ionicons name="add" size={40} color="#ffffff" />
+      </Pressable>
+    </View>
+  );
+}
+
+function DatePickerModal({
+  visible,
+  initialValue,
+  onClose,
+  onSave,
+}: {
+  visible: boolean;
+  initialValue?: string;
+  onClose: () => void;
+  onSave: (date: string) => void;
+}) {
+  const [text, setText] = useState(initialValue ?? "");
+  const [error, setError] = useState<string | null>(null);
+
+  // 모달이 열릴 때마다 입력값 초기화
+  useEffect(() => {
+    if (visible) {
+      setText(initialValue ?? "");
+      setError(null);
+    }
+  }, [visible, initialValue]);
+
+  function handleSave() {
+    const trimmed = text.trim();
+
+    if (!isValidDateStr(trimmed)) {
+      setError("날짜를 YYYY-MM-DD 형식으로 입력해주세요.");
+      return;
+    }
+
+    if (trimmed > todayStr()) {
+      setError("미래 날짜는 입력할 수 없어요.");
+      return;
+    }
+
+    onSave(trimmed);
+  }
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.modalBackdrop}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>시작 날짜 입력</Text>
+          <Text style={styles.modalHint}>
+            예: {todayStr()}
+          </Text>
+
+          <TextInput
+            style={[styles.input, error ? styles.inputError : null]}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={palette.textFaint}
+            value={text}
+            onChangeText={(value) => {
+              setText(value);
+              setError(null);
+            }}
+            keyboardType="numbers-and-punctuation"
+            autoFocus
+          />
+
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+          <Pressable style={styles.todayButton} onPress={() => setText(todayStr())}>
+            <Text style={styles.todayButtonText}>오늘로 채우기</Text>
+          </Pressable>
+
+          <View style={styles.modalActions}>
+            <Pressable style={styles.cancelButton} onPress={onClose}>
+              <Text style={styles.cancelButtonText}>취소</Text>
+            </Pressable>
+            <Pressable style={styles.saveButton} onPress={handleSave}>
+              <Text style={styles.saveButtonText}>저장</Text>
+            </Pressable>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#fff7f2",
+    backgroundColor: palette.background,
   },
-  container: {
-    flexGrow: 1,
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  content: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: 24,
-    paddingBottom: 110,
   },
-  homeBox: {
-  width: "100%",
-  alignItems: "center",
-  justifyContent: "center",
-},
+  ddayWrap: {
+    width: "100%",
+    alignItems: "center",
+  },
   smallText: {
     fontSize: 16,
-    color: "#b36b5e",
+    color: palette.accent,
     marginBottom: 24,
+    fontWeight: "600",
   },
   label: {
     fontSize: 20,
-    color: "#7a5c55",
+    color: palette.textMuted,
     marginBottom: 8,
   },
   dayText: {
     fontSize: 64,
     fontWeight: "800",
-    color: "#2f2a28",
-    marginBottom: 32,
+    color: palette.text,
+    marginBottom: 24,
   },
-  cardList: {
-    width: "100%",
-    gap: 12,
-  },
-  card: {
-    width: "100%",
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 18,
+  startDateRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    shadowColor: "#000000",
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: palette.accentSoft,
+    borderRadius: 999,
   },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#2f2a28",
-  },
-  cardDate: {
-    marginTop: 6,
+  startDateText: {
     fontSize: 14,
-    color: "#9a7a72",
-  },
-  cardStatus: {
-    fontSize: 18,
     fontWeight: "700",
-    color: "#d46a5f",
+    color: palette.accentDark,
   },
-  emptyBox: {
-    width: "100%",
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 28,
-    alignItems: "center",
-  },
-  emptyTitle: {
-    fontSize: 28,
+  firstRunTitle: {
+    fontSize: 24,
     fontWeight: "800",
-    color: "#2f2a28",
+    color: palette.text,
+    textAlign: "center",
     marginBottom: 12,
   },
-  emptyText: {
-    fontSize: 17,
-    color: "#7a5c55",
+  firstRunText: {
+    fontSize: 16,
+    color: palette.textMuted,
     textAlign: "center",
     lineHeight: 24,
+    marginBottom: 32,
   },
-  wishBox: {
-    width: "100%",
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 24,
+  bigAddButton: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: palette.accent,
     alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000000",
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCard: {
+    width: "100%",
+    backgroundColor: palette.surface,
+    borderRadius: 20,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: palette.text,
+    marginBottom: 4,
+  },
+  modalHint: {
+    fontSize: 14,
+    color: palette.textFaint,
+    marginBottom: 16,
   },
   input: {
     width: "100%",
     height: 52,
-    backgroundColor: "#fff7f2",
+    backgroundColor: palette.background,
     borderRadius: 14,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: "#2f2a28",
-    marginTop: 20,
+    color: palette.text,
   },
-  addButton: {
-    width: "100%",
-    height: 52,
-    backgroundColor: "#d46a5f",
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 12,
+  inputError: {
+    borderWidth: 1,
+    borderColor: palette.accent,
   },
-  addButtonText: {
-    color: "#ffffff",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  photoBox: {
-  width: "100%",
-  backgroundColor: "#ffffff",
-  borderRadius: 16,
-  padding: 24,
-  alignItems: "center",
-},
-photoList: {
-  width: "100%",
-  marginTop: 20,
-  flexDirection: "row",
-  flexWrap: "wrap",
-  gap: 4,
-},
-photoCard: {
-  width: "32%",
-  aspectRatio: 1,
-  overflow: "hidden",
-  backgroundColor: "#fff7f2",
-},
-photoImage: {
-  width: "100%",
-  height: "100%",
-},
-photoInfo: {
-  position: "absolute",
-  right: 6,
-  bottom: 6,
-  alignItems: "flex-end",
-},
-photoText: {
-  color: "#ffffff",
-  fontSize: 10,
-  fontWeight: "800",
-  textShadowColor: "rgba(0, 0, 0, 0.7)",
-  textShadowOffset: { width: 0, height: 1 },
-  textShadowRadius: 3,
-},
-modalBackground: {
-  flex: 1,
-  backgroundColor: "rgba(0, 0, 0, 0.92)",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: 16,
-},
-modalContent: {
-  width: "100%",
-  height: "82%",
-  alignItems: "center",
-  justifyContent: "center",
-},
-fullPhoto: {
-  width: "100%",
-  height: "100%",
-},
-fullPhotoInfo: {
-  position: "absolute",
-  right: 14,
-  bottom: 74,
-  alignItems: "flex-end",
-},
-fullPhotoText: {
-  color: "#ffffff",
-  fontSize: 14,
-  fontWeight: "800",
-  textShadowColor: "rgba(0, 0, 0, 0.8)",
-  textShadowOffset: { width: 0, height: 1 },
-  textShadowRadius: 4,
-},
-modalActions: {
-  position: "absolute",
-  left: 0,
-  right: 0,
-  bottom: 12,
-  flexDirection: "row",
-  justifyContent: "center",
-  gap: 12,
-},
-closeButton: {
-  backgroundColor: "#ffffff",
-  borderRadius: 12,
-  paddingVertical: 12,
-  paddingHorizontal: 22,
-},
-closeButtonText: {
-  color: "#2f2a28",
-  fontSize: 15,
-  fontWeight: "800",
-},
-photoDeleteButton: {
-  backgroundColor: "#d46a5f",
-  borderRadius: 12,
-  paddingVertical: 12,
-  paddingHorizontal: 22,
-},
-photoDeleteButtonText: {
-  color: "#ffffff",
-  fontSize: 15,
-  fontWeight: "800",
-},
-  wishList: {
-    width: "100%",
-    marginTop: 20,
-    gap: 10,
-  },
-  wishItem: {
-    width: "100%",
-    backgroundColor: "#fff7f2",
-    borderRadius: 14,
-    padding: 16,
-  },
-  wishItemText: {
-    fontSize: 16,
-    color: "#2f2a28",
+  errorText: {
+    marginTop: 8,
+    fontSize: 13,
+    color: palette.danger,
     fontWeight: "600",
   },
-  wishItemTextDone: {
-  fontSize: 16,
-  color: "#a8948f",
-  fontWeight: "600",
-  textDecorationLine: "line-through",
-},
-wishActions: {
-  flexDirection: "row",
-  justifyContent: "flex-end",
-  gap: 8,
-  marginTop: 12,
-},
-doneButton: {
-  backgroundColor: "#e5f1dc",
-  borderRadius: 10,
-  paddingVertical: 8,
-  paddingHorizontal: 12,
-},
-doneButtonText: {
-  color: "#4f7d35",
-  fontSize: 14,
-  fontWeight: "800",
-},
-  deleteButton: {
-  marginTop: 12,
-  alignSelf: "flex-end",
-  backgroundColor: "#f1d4cf",
-  borderRadius: 10,
-  paddingVertical: 8,
-  paddingHorizontal: 12,
-},
-deleteButtonText: {
-  color: "#9b3f38",
-  fontSize: 14,
-  fontWeight: "800",
-},
-  tabBar: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 24,
-    height: 64,
-    backgroundColor: "#ffffff",
-    borderRadius: 22,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 6,
-    shadowColor: "#000000",
-    shadowOpacity: 0.1,
-    shadowRadius: 14,
-    shadowOffset: { width: 0, height: 5 },
-    elevation: 5,
+  todayButton: {
+    alignSelf: "flex-start",
+    marginTop: 10,
   },
-  tabButton: {
+  todayButtonText: {
+    fontSize: 14,
+    color: palette.accent,
+    fontWeight: "700",
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 20,
+  },
+  cancelButton: {
     flex: 1,
-    height: "100%",
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: palette.background,
     alignItems: "center",
     justifyContent: "center",
   },
-  tabText: {
-    fontSize: 15,
+  cancelButtonText: {
+    fontSize: 16,
     fontWeight: "700",
-    color: "#9a7a72",
+    color: palette.textMuted,
   },
-  tabTextActive: {
-    fontSize: 15,
+  saveButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    backgroundColor: palette.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  saveButtonText: {
+    fontSize: 16,
     fontWeight: "800",
-    color: "#d46a5f",
+    color: "#ffffff",
   },
 });

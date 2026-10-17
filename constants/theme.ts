@@ -27,6 +27,22 @@ export const Colors = {
   },
 };
 
+export const palette = {
+  background: '#fff7f2',
+  surface: '#ffffff',
+  border: '#f0e4de',
+  text: '#2f2a28',
+  textMuted: '#7a5c55',
+  textFaint: '#9a7a72',
+  accent: '#d46a5f',
+  accentDark: '#b3554b',
+  accentSoft: '#f6dfda',
+  green: '#4f7d35',
+  greenSoft: '#e5f1dc',
+  danger: '#9b3f38',
+  dangerSoft: '#f1d4cf',
+} as const;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

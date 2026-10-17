@@ -5,12 +5,12 @@ import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -101,13 +101,9 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.column}>
-        <FlatList
+        <ScrollView
           style={styles.list}
-          data={photos}
-          keyExtractor={(item) => item.id}
-          numColumns={3}
-          contentContainerStyle={styles.gridContent}
-          columnWrapperStyle={styles.gridRow}
+          contentContainerStyle={styles.scrollContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -115,35 +111,36 @@ export default function HomeScreen() {
               tintColor="#ffffff"
               colors={["#ffffff"]}
             />
-          }
-          ListHeaderComponent={
-            <Hero
-              startDate={startDate}
-              loadingDate={loadingDate}
-              onEditDate={() => setPickerVisible(true)}
-              onAddPhoto={handleAddPhoto}
-              onOpenCalendar={() => router.push("/calendar")}
-              onOpenWish={() => router.push("/wish")}
-            />
-          }
-          renderItem={({ item }) => (
-            <Pressable
-              style={[styles.cell, { width: cellWidth }]}
-              onPress={() =>
-                router.push({
-                  pathname: "/photo/[id]",
-                  params: { id: item.id },
-                })
-              }>
-              <Image
-                source={{ uri: item.image_url }}
-                style={styles.cellImage}
-                contentFit="cover"
-                transition={150}
-              />
-            </Pressable>
-          )}
-        />
+          }>
+          <Hero
+            startDate={startDate}
+            loadingDate={loadingDate}
+            onEditDate={() => setPickerVisible(true)}
+            onAddPhoto={handleAddPhoto}
+            onOpenCalendar={() => router.push("/calendar")}
+            onOpenWish={() => router.push("/wish")}
+          />
+          <View style={styles.grid}>
+            {photos.map((photo) => (
+              <Pressable
+                key={photo.id}
+                style={[styles.cell, { width: cellWidth }]}
+                onPress={() =>
+                  router.push({
+                    pathname: "/photo/[id]",
+                    params: { id: photo.id },
+                  })
+                }>
+                <Image
+                  source={{ uri: photo.image_url }}
+                  style={styles.cellImage}
+                  contentFit="cover"
+                  transition={150}
+                />
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
       </View>
 
       <DatePickerModal
@@ -364,11 +361,12 @@ const styles = StyleSheet.create({
   iconButton: {
     padding: 4,
   },
-  gridContent: {
-    gap: GAP,
+  scrollContent: {
     paddingBottom: 32,
   },
-  gridRow: {
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: GAP,
   },
   cell: {

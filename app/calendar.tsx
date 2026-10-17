@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -26,6 +26,7 @@ import { formatKoreanDate, isPastDate, isValidDateStr, todayStr } from "@/lib/da
 import type { CalendarEvent, CalendarEventType } from "@/lib/types";
 
 export default function CalendarScreen() {
+  const router = useRouter();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [formVisible, setFormVisible] = useState(false);
@@ -61,7 +62,7 @@ export default function CalendarScreen() {
     setFormVisible(true);
   }
 
-  async function handleDelete(event: CalendarEvent) {
+  function handleDelete(event: CalendarEvent) {
     Alert.alert("일정 삭제", `"${event.title}" 일정을 삭제할까요?`, [
       { text: "취소", style: "cancel" },
       {
@@ -93,23 +94,24 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
+        <Pressable style={styles.headerButton} onPress={() => router.back()} hitSlop={8}>
+          <Ionicons name="chevron-back" size={26} color="#ffffff" />
+        </Pressable>
         <Text style={styles.title}>캘린더</Text>
-        <Pressable style={styles.headerAddButton} onPress={openAdd}>
-          <Ionicons name="add" size={26} color="#ffffff" />
+        <Pressable style={styles.headerButton} onPress={openAdd} hitSlop={8}>
+          <Ionicons name="add" size={28} color="#ffffff" />
         </Pressable>
       </View>
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={palette.accent} />
+          <ActivityIndicator color="#ffffff" />
         </View>
       ) : events.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="calendar-outline" size={48} color={palette.textFaint} />
           <Text style={styles.emptyTitle}>아직 일정이 없어요</Text>
-          <Text style={styles.emptyText}>
-            기념일이나 스케줄을 등록해보세요.
-          </Text>
+          <Text style={styles.emptyText}>기념일이나 스케줄을 등록해보세요.</Text>
         </View>
       ) : (
         <FlatList
@@ -193,10 +195,7 @@ function EventCard({
     <View style={styles.card}>
       <View style={styles.cardLeft}>
         <View
-          style={[
-            styles.badge,
-            isAnniversary ? styles.badgeAnniversary : styles.badgeSchedule,
-          ]}>
+          style={[styles.badge, isAnniversary ? styles.badgeAnniversary : styles.badgeSchedule]}>
           <Text
             style={[
               styles.badgeText,
@@ -206,9 +205,7 @@ function EventCard({
           </Text>
         </View>
 
-        <Text style={[styles.cardTitle, done && styles.cardTitleDone]}>
-          {event.title}
-        </Text>
+        <Text style={[styles.cardTitle, done && styles.cardTitleDone]}>{event.title}</Text>
 
         <Text style={[styles.cardDate, done && styles.cardDateDone]}>
           {formatKoreanDate(event.date)}
@@ -221,7 +218,7 @@ function EventCard({
           <Ionicons name="pencil" size={18} color={palette.textMuted} />
         </Pressable>
         <Pressable style={styles.iconButton} onPress={onDelete} hitSlop={8}>
-          <Ionicons name="trash-outline" size={18} color={palette.danger} />
+          <Ionicons name="trash-outline" size={18} color={palette.text} />
         </Pressable>
       </View>
     </View>
@@ -256,12 +253,10 @@ function EventFormModal({
 
   async function handleSave() {
     const trimmedTitle = title.trim();
-
     if (!trimmedTitle) {
       setError("내용을 입력해주세요.");
       return;
     }
-
     if (!isValidDateStr(date.trim())) {
       setError("날짜를 YYYY-MM-DD 형식으로 입력해주세요.");
       return;
@@ -276,16 +271,10 @@ function EventFormModal({
   }
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modalBackdrop}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>
-            {editing ? "일정 수정" : "일정 추가"}
-          </Text>
+          <Text style={styles.modalTitle}>{editing ? "일정 수정" : "일정 추가"}</Text>
 
           <Text style={styles.fieldLabel}>내용</Text>
           <TextInput
@@ -306,10 +295,7 @@ function EventFormModal({
                   style={[styles.typeChip, selected && styles.typeChipSelected]}
                   onPress={() => setType(t)}>
                   <Text
-                    style={[
-                      styles.typeChipText,
-                      selected && styles.typeChipTextSelected,
-                    ]}>
+                    style={[styles.typeChipText, selected && styles.typeChipTextSelected]}>
                     {t === "schedule" ? "스케줄" : "기념일"}
                   </Text>
                 </Pressable>
@@ -329,9 +315,7 @@ function EventFormModal({
             }}
             keyboardType="numbers-and-punctuation"
           />
-          <Pressable
-            style={styles.todayButton}
-            onPress={() => setDate(todayStr())}>
+          <Pressable style={styles.todayButton} onPress={() => setDate(todayStr())}>
             <Text style={styles.todayButtonText}>오늘로 채우기</Text>
           </Pressable>
 
@@ -341,12 +325,9 @@ function EventFormModal({
             <Pressable style={styles.cancelButton} onPress={onClose}>
               <Text style={styles.cancelButtonText}>취소</Text>
             </Pressable>
-            <Pressable
-              style={styles.saveButton}
-              onPress={handleSave}
-              disabled={saving}>
+            <Pressable style={styles.saveButton} onPress={handleSave} disabled={saving}>
               {saving ? (
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color={palette.accentDark} />
               ) : (
                 <Text style={styles.saveButtonText}>저장</Text>
               )}
@@ -367,22 +348,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 12,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: palette.text,
-  },
-  headerAddButton: {
+  headerButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: palette.accent,
     alignItems: "center",
     justifyContent: "center",
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: palette.text,
   },
   center: {
     flex: 1,
@@ -404,7 +384,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   listContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 24,
   },
   sectionHeader: {
@@ -418,6 +398,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
     borderRadius: 16,
     padding: 16,
     marginBottom: 10,
@@ -433,17 +415,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   badgeSchedule: {
-    backgroundColor: palette.greenSoft,
+    backgroundColor: palette.accentSoft,
   },
   badgeAnniversary: {
-    backgroundColor: palette.accentSoft,
+    backgroundColor: palette.accent,
   },
   badgeText: {
     fontSize: 11,
     fontWeight: "800",
   },
   badgeScheduleText: {
-    color: palette.green,
+    color: palette.text,
   },
   badgeAnniversaryText: {
     color: palette.accentDark,
@@ -483,7 +465,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: "100%",
-    backgroundColor: palette.surface,
+    backgroundColor: palette.surfaceSolid,
     borderRadius: 20,
     padding: 24,
   },
@@ -517,7 +499,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 18,
     borderRadius: 999,
-    backgroundColor: palette.background,
+    backgroundColor: palette.accentSoft,
     borderWidth: 1,
     borderColor: palette.border,
   },
@@ -528,10 +510,10 @@ const styles = StyleSheet.create({
   typeChipText: {
     fontSize: 14,
     fontWeight: "700",
-    color: palette.textMuted,
+    color: palette.text,
   },
   typeChipTextSelected: {
-    color: "#ffffff",
+    color: palette.accentDark,
   },
   todayButton: {
     alignSelf: "flex-start",
@@ -539,14 +521,14 @@ const styles = StyleSheet.create({
   },
   todayButtonText: {
     fontSize: 14,
-    color: palette.accent,
+    color: palette.text,
     fontWeight: "700",
   },
   errorText: {
     marginTop: 10,
     fontSize: 13,
-    color: palette.danger,
-    fontWeight: "600",
+    color: "#FFF0F0",
+    fontWeight: "700",
   },
   modalActions: {
     flexDirection: "row",
@@ -564,7 +546,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 16,
     fontWeight: "700",
-    color: palette.textMuted,
+    color: palette.text,
   },
   saveButton: {
     flex: 1,
@@ -577,6 +559,6 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#ffffff",
+    color: palette.accentDark,
   },
 });

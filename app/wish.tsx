@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
@@ -25,6 +25,7 @@ import {
 } from "@/lib/wishes";
 
 export default function WishScreen() {
+  const router = useRouter();
   const [wishes, setWishes] = useState<WishItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
@@ -58,7 +59,6 @@ export default function WishScreen() {
     if (!text || adding) {
       return;
     }
-
     setAdding(true);
     try {
       await addWish(text);
@@ -99,7 +99,6 @@ export default function WishScreen() {
     if (!text || !editing) {
       return;
     }
-
     try {
       await updateWishText(editing.id, text);
       setEditVisible(false);
@@ -140,7 +139,11 @@ export default function WishScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
+        <Pressable style={styles.headerButton} onPress={() => router.back()} hitSlop={8}>
+          <Ionicons name="chevron-back" size={26} color="#ffffff" />
+        </Pressable>
         <Text style={styles.title}>위시</Text>
+        <View style={styles.headerButton} />
       </View>
 
       <View style={styles.inputRow}>
@@ -153,12 +156,9 @@ export default function WishScreen() {
           onSubmitEditing={handleAdd}
           returnKeyType="done"
         />
-        <Pressable
-          style={styles.addButton}
-          onPress={handleAdd}
-          disabled={adding}>
+        <Pressable style={styles.addButton} onPress={handleAdd} disabled={adding}>
           {adding ? (
-            <ActivityIndicator size="small" color="#ffffff" />
+            <ActivityIndicator size="small" color={palette.accentDark} />
           ) : (
             <Text style={styles.addButtonText}>추가</Text>
           )}
@@ -167,15 +167,13 @@ export default function WishScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={palette.accent} />
+          <ActivityIndicator color="#ffffff" />
         </View>
       ) : wishes.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="heart-outline" size={48} color={palette.textFaint} />
           <Text style={styles.emptyTitle}>아직 위시가 없어요</Text>
-          <Text style={styles.emptyText}>
-            가고 싶은 곳과 하고 싶은 일을 적어보세요.
-          </Text>
+          <Text style={styles.emptyText}>가고 싶은 곳과 하고 싶은 일을 적어보세요.</Text>
         </View>
       ) : (
         <>
@@ -245,21 +243,17 @@ function WishRow({
   return (
     <View style={styles.card}>
       <Pressable style={styles.checkbox} onPress={onToggle} hitSlop={8}>
-        {wish.done ? (
-          <Ionicons name="checkmark" size={18} color="#ffffff" />
-        ) : null}
+        {wish.done ? <Ionicons name="checkmark" size={18} color="#ffffff" /> : null}
       </Pressable>
 
-      <Text style={[styles.cardText, wish.done && styles.cardTextDone]}>
-        {wish.text}
-      </Text>
+      <Text style={[styles.cardText, wish.done && styles.cardTextDone]}>{wish.text}</Text>
 
       <View style={styles.cardActions}>
         <Pressable style={styles.iconButton} onPress={onEdit} hitSlop={8}>
           <Ionicons name="pencil" size={18} color={palette.textMuted} />
         </Pressable>
         <Pressable style={styles.iconButton} onPress={onDelete} hitSlop={8}>
-          <Ionicons name="trash-outline" size={18} color={palette.danger} />
+          <Ionicons name="trash-outline" size={18} color={palette.text} />
         </Pressable>
       </View>
     </View>
@@ -272,19 +266,29 @@ const styles = StyleSheet.create({
     backgroundColor: palette.background,
   },
   header: {
-    paddingHorizontal: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 12,
   },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: "800",
     color: palette.text,
   },
   inputRow: {
     flexDirection: "row",
     gap: 8,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     marginBottom: 8,
   },
   input: {
@@ -309,7 +313,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: 15,
     fontWeight: "800",
-    color: "#ffffff",
+    color: palette.accentDark,
   },
   center: {
     flex: 1,
@@ -331,20 +335,22 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   counter: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     fontSize: 13,
     fontWeight: "700",
     color: palette.textFaint,
     marginBottom: 4,
   },
   listContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingBottom: 24,
   },
   card: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: palette.surface,
+    borderWidth: 1,
+    borderColor: palette.border,
     borderRadius: 16,
     padding: 16,
     marginBottom: 10,
@@ -354,7 +360,8 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 13,
     borderWidth: 2,
-    borderColor: palette.accent,
+    borderColor: palette.text,
+    backgroundColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
@@ -385,7 +392,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: "100%",
-    backgroundColor: palette.surface,
+    backgroundColor: palette.surfaceSolid,
     borderRadius: 20,
     padding: 24,
   },
@@ -420,7 +427,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: 16,
     fontWeight: "700",
-    color: palette.textMuted,
+    color: palette.text,
   },
   saveButton: {
     flex: 1,
@@ -433,6 +440,6 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: "800",
-    color: "#ffffff",
+    color: palette.accentDark,
   },
 });

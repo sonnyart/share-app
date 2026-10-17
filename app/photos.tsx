@@ -17,6 +17,8 @@ import { palette } from "@/constants/theme";
 import { addPhoto, loadPhotos } from "@/lib/photos";
 import type { PhotoMemory } from "@/lib/types";
 
+const GAP = 3;
+
 export default function PhotosScreen() {
   const router = useRouter();
   const [photos, setPhotos] = useState<PhotoMemory[]>([]);
@@ -57,14 +59,11 @@ export default function PhotosScreen() {
     if (busy) {
       return;
     }
-
     setBusy(true);
     try {
       const added = await addPhoto();
-
       if (added) {
-        const data = await loadPhotos();
-        setPhotos(data);
+        setPhotos(await loadPhotos());
       }
     } catch (error) {
       Alert.alert(
@@ -79,30 +78,32 @@ export default function PhotosScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.header}>
+        <Pressable style={styles.headerButton} onPress={() => router.back()} hitSlop={8}>
+          <Ionicons name="chevron-back" size={26} color="#ffffff" />
+        </Pressable>
         <Text style={styles.title}>사진</Text>
         <Pressable
-          style={styles.headerAddButton}
+          style={styles.headerButton}
           onPress={handleAddPhoto}
-          disabled={busy}>
+          disabled={busy}
+          hitSlop={8}>
           {busy ? (
             <ActivityIndicator size="small" color="#ffffff" />
           ) : (
-            <Ionicons name="add" size={26} color="#ffffff" />
+            <Ionicons name="add" size={28} color="#ffffff" />
           )}
         </Pressable>
       </View>
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={palette.accent} />
+          <ActivityIndicator color="#ffffff" />
         </View>
       ) : photos.length === 0 ? (
         <View style={styles.center}>
           <Ionicons name="images-outline" size={48} color={palette.textFaint} />
           <Text style={styles.emptyTitle}>아직 사진이 없어요</Text>
-          <Text style={styles.emptyText}>
-            우측 상단 + 버튼으로 함께한 순간을 남겨보세요.
-          </Text>
+          <Text style={styles.emptyText}>우측 상단 + 버튼으로 함께한 순간을 남겨보세요.</Text>
         </View>
       ) : (
         <FlatList
@@ -134,8 +135,6 @@ export default function PhotosScreen() {
   );
 }
 
-const GAP = 3;
-
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
@@ -145,22 +144,21 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
     paddingTop: 8,
     paddingBottom: 12,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: palette.text,
-  },
-  headerAddButton: {
+  headerButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: palette.accent,
     alignItems: "center",
     justifyContent: "center",
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: palette.text,
   },
   center: {
     flex: 1,
@@ -191,7 +189,7 @@ const styles = StyleSheet.create({
   cell: {
     flex: 1,
     aspectRatio: 1,
-    backgroundColor: palette.border,
+    backgroundColor: palette.surfaceSolid,
     borderRadius: 4,
     overflow: "hidden",
   },

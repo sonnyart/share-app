@@ -28,19 +28,25 @@ export const Colors = {
 };
 
 export const palette = {
-  background: '#fff7f2',
-  surface: '#ffffff',
-  border: '#f0e4de',
-  text: '#2f2a28',
-  textMuted: '#7a5c55',
-  textFaint: '#9a7a72',
-  accent: '#d46a5f',
-  accentDark: '#b3554b',
-  accentSoft: '#f6dfda',
-  green: '#4f7d35',
-  greenSoft: '#e5f1dc',
-  danger: '#9b3f38',
-  dangerSoft: '#f1d4cf',
+  background: '#B76E79', // rose gold
+  backgroundDark: '#96545F', // deeper rose gold
+  surface: 'rgba(255, 255, 255, 0.16)',
+  surfaceSolid: '#C98A93',
+  border: 'rgba(255, 255, 255, 0.28)',
+  text: '#ffffff',
+  textMuted: 'rgba(255, 255, 255, 0.88)',
+  textFaint: 'rgba(255, 255, 255, 0.62)',
+  accent: '#ffffff',
+  accentDark: '#96545F',
+  accentSoft: 'rgba(255, 255, 255, 0.22)',
+  green: '#F4F9F0',
+  greenSoft: 'rgba(255, 255, 255, 0.26)',
+  danger: '#4A1C24',
+  dangerSoft: 'rgba(0, 0, 0, 0.16)',
+} as const;
+
+export const fontFamily = {
+  handwriting: 'Pacifico_400Regular',
 } as const;
 
 export const Fonts = Platform.select({

@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
   Modal,
   Pressable,
@@ -14,6 +15,7 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
+  runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -32,33 +34,49 @@ export default function PhotoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = Dimensions.get("window");
 
   const [photos, setPhotos] = useState<PhotoMemory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [index, setIndex] = useState(0);
+  const [zoomed, setZoomed] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
-  const photo = photos.find((p) => p.id === id) ?? null;
-
-  const load = useCallback(async () => {
-    try {
-      const data = await loadPhotos();
-      setPhotos(data);
-    } catch (error) {
-      Alert.alert(
-        "사진 불러오기 오류",
-        error instanceof Error ? error.message : "알 수 없는 오류"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    load();
-  }, [load]);
+    let active = true;
+
+    loadPhotos()
+      .then((data) => {
+        if (!active) {
+          return;
+        }
+        const i = data.findIndex((p) => p.id === id);
+        setPhotos(data);
+        setIndex(i >= 0 ? i : 0);
+      })
+      .catch((error) => {
+        if (active) {
+          Alert.alert(
+            "사진 불러오기 오류",
+            error instanceof Error ? error.message : "알 수 없는 오류"
+          );
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const current = photos[index];
 
   function toggleSelect(photoId: string) {
     setSelectedIds((prev) => {
@@ -77,46 +95,39 @@ export default function PhotoDetailScreen() {
       return;
     }
 
-    Alert.alert(
-      "사진 삭제",
-      `${targets.length}장의 사진을 삭제할까요?`,
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "삭제",
-          style: "destructive",
-          onPress: async () => {
-            setBusy(true);
-            try {
-              await deletePhotos(targets);
+    Alert.alert("사진 삭제", `${targets.length}장의 사진을 삭제할까요?`, [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: async () => {
+          setBusy(true);
+          try {
+            await deletePhotos(targets);
+            const currentDeleted = targets.some((t) => t.id === current?.id);
 
-              // 현재 보고 있던 사진이 삭제되면 뒤로 이동
-              if (targets.some((t) => t.id === id)) {
-                router.back();
-                return;
-              }
-
-              setPhotos((prev) => prev.filter((p) => !targets.some((t) => t.id === p.id)));
-              setSelectMode(false);
-              setSelectedIds(new Set());
-            } catch (error) {
-              Alert.alert(
-                "삭제 오류",
-                error instanceof Error ? error.message : "알 수 없는 오류"
-              );
-            } finally {
-              setBusy(false);
+            if (currentDeleted) {
+              router.back();
+              return;
             }
-          },
-        },
-      ]
-    );
-  }
 
-  function deleteCurrent() {
-    if (photo) {
-      confirmDelete([photo]);
-    }
+            const remaining = photos.filter(
+              (p) => !targets.some((t) => t.id === p.id)
+            );
+            setPhotos(remaining);
+            setSelectMode(false);
+            setSelectedIds(new Set());
+          } catch (error) {
+            Alert.alert(
+              "삭제 오류",
+              error instanceof Error ? error.message : "알 수 없는 오류"
+            );
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
   }
 
   const selected = photos.filter((p) => selectedIds.has(p.id));
@@ -125,17 +136,6 @@ export default function PhotoDetailScreen() {
     return (
       <View style={styles.darkScreen}>
         <ActivityIndicator color="#ffffff" />
-      </View>
-    );
-  }
-
-  if (!photo && !selectMode) {
-    return (
-      <View style={styles.darkScreen}>
-        <Text style={styles.notFoundText}>사진을 찾을 수 없어요</Text>
-        <Pressable style={styles.notFoundButton} onPress={() => router.back()}>
-          <Text style={styles.notFoundButtonText}>돌아가기</Text>
-        </Pressable>
       </View>
     );
   }
@@ -184,22 +184,15 @@ export default function PhotoDetailScreen() {
           renderItem={({ item }) => {
             const isSelected = selectedIds.has(item.id);
             return (
-              <Pressable
-                style={styles.cell}
-                onPress={() => toggleSelect(item.id)}>
+              <Pressable style={styles.cell} onPress={() => toggleSelect(item.id)}>
                 <Image
                   source={{ uri: item.image_url }}
                   style={styles.cellImage}
                   contentFit="cover"
                 />
-                {isSelected ? (
-                  <View style={styles.cellDim} />
-                ) : null}
+                {isSelected ? <View style={styles.cellDim} /> : null}
                 <View
-                  style={[
-                    styles.selectCircle,
-                    isSelected && styles.selectCircleActive,
-                  ]}>
+                  style={[styles.selectCircle, isSelected && styles.selectCircleActive]}>
                   {isSelected ? (
                     <Ionicons name="checkmark" size={16} color="#ffffff" />
                   ) : null}
@@ -212,24 +205,57 @@ export default function PhotoDetailScreen() {
     );
   }
 
-  return (
-    <ZoomablePhoto photo={photo!} insetsTop={insets.top}>
-      <View style={[styles.topBar, { top: insets.top + 8 }]}>
-        <Pressable style={styles.circleButton} onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="chevron-back" size={24} color="#ffffff" />
-        </Pressable>
-
-        <Pressable style={styles.circleButton} onPress={() => setMenuVisible(true)} hitSlop={8}>
-          <Ionicons name="ellipsis-horizontal" size={22} color="#ffffff" />
+  if (photos.length === 0 || !current) {
+    return (
+      <View style={styles.darkScreen}>
+        <Text style={styles.notFoundText}>사진을 찾을 수 없어요</Text>
+        <Pressable style={styles.notFoundButton} onPress={() => router.back()}>
+          <Text style={styles.notFoundButtonText}>돌아가기</Text>
         </Pressable>
       </View>
+    );
+  }
 
-      <View style={[styles.locationBadge, { bottom: insets.bottom + 24 }]}>
-        <View style={styles.locationRow}>
-          <Ionicons name="location" size={13} color="#ffffff" />
-          <Text style={styles.locationText}>{photo!.location}</Text>
+  return (
+    <View style={styles.darkScreen}>
+      <FlatList
+        data={photos}
+        horizontal
+        pagingEnabled
+        scrollEnabled={!zoomed}
+        showsHorizontalScrollIndicator={false}
+        initialScrollIndex={index}
+        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        onScrollToIndexFailed={() => {}}
+        onMomentumScrollEnd={(e) => {
+          const i = Math.round(e.nativeEvent.contentOffset.x / width);
+          setIndex(Math.max(0, Math.min(photos.length - 1, i)));
+        }}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={{ width }}>
+            <ZoomablePhoto photo={item} onZoomChange={setZoomed} />
+          </View>
+        )}
+      />
+
+      <View style={[styles.topBar, { top: insets.top + 8 }]}>
+        <Pressable style={styles.circleButton} onPress={() => router.back()} hitSlop={8}>
+          <Ionicons name="close" size={26} color="#ffffff" />
+        </Pressable>
+
+        <View style={styles.counterBadge}>
+          <Text style={styles.counterText}>
+            {index + 1} / {photos.length}
+          </Text>
         </View>
-        <Text style={styles.dateText}>{photo!.date}</Text>
+
+        <Pressable
+          style={styles.circleButton}
+          onPress={() => setMenuVisible(true)}
+          hitSlop={8}>
+          <Ionicons name="ellipsis-horizontal" size={22} color="#ffffff" />
+        </Pressable>
       </View>
 
       <Modal
@@ -245,7 +271,7 @@ export default function PhotoDetailScreen() {
                 setMenuVisible(false);
                 setSelectMode(true);
               }}>
-              <Ionicons name="checkmark-circle-outline" size={22} color={palette.text} />
+              <Ionicons name="checkmark-circle-outline" size={22} color="#ffffff" />
               <Text style={styles.sheetItemText}>사진 선택</Text>
             </Pressable>
 
@@ -255,35 +281,38 @@ export default function PhotoDetailScreen() {
               style={styles.sheetItem}
               onPress={() => {
                 setMenuVisible(false);
-                deleteCurrent();
+                confirmDelete([current]);
               }}>
-              <Ionicons name="trash-outline" size={22} color={palette.danger} />
-              <Text style={[styles.sheetItemText, styles.sheetItemDanger]}>
-                이 사진 삭제
-              </Text>
+              <Ionicons name="trash-outline" size={22} color="#ffffff" />
+              <Text style={styles.sheetItemText}>이 사진 삭제</Text>
             </Pressable>
           </View>
         </Pressable>
       </Modal>
-    </ZoomablePhoto>
+    </View>
   );
 }
 
 function ZoomablePhoto({
   photo,
-  insetsTop,
-  children,
+  onZoomChange,
 }: {
   photo: PhotoMemory;
-  insetsTop: number;
-  children: React.ReactNode;
+  onZoomChange: (zoomed: boolean) => void;
 }) {
+  const [zoomed, setZoomed] = useState(false);
+
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
+
+  function notifyZoom(next: boolean) {
+    setZoomed(next);
+    onZoomChange(next);
+  }
 
   function resetZoom() {
     scale.value = withTiming(1);
@@ -305,10 +334,14 @@ function ZoomablePhoto({
       savedScale.value = scale.value;
       if (scale.value <= MIN_SCALE + 0.01) {
         resetZoom();
+        runOnJS(notifyZoom)(false);
+      } else {
+        runOnJS(notifyZoom)(true);
       }
     });
 
   const pan = Gesture.Pan()
+    .enabled(zoomed)
     .onUpdate((e) => {
       if (scale.value > 1) {
         translateX.value = savedTranslateX.value + e.translationX;
@@ -325,9 +358,11 @@ function ZoomablePhoto({
     .onEnd(() => {
       if (scale.value > 1) {
         resetZoom();
+        runOnJS(notifyZoom)(false);
       } else {
         scale.value = withTiming(DOUBLE_TAP_SCALE);
         savedScale.value = DOUBLE_TAP_SCALE;
+        runOnJS(notifyZoom)(true);
       }
     });
 
@@ -342,7 +377,7 @@ function ZoomablePhoto({
   }));
 
   return (
-    <View style={styles.darkScreen}>
+    <View style={styles.zoomCell}>
       <GestureDetector gesture={composed}>
         <Animated.View style={[styles.zoomContainer, animatedStyle]}>
           <Image
@@ -354,7 +389,13 @@ function ZoomablePhoto({
         </Animated.View>
       </GestureDetector>
 
-      {children}
+      <View style={styles.locationBadge}>
+        <View style={styles.locationRow}>
+          <Ionicons name="location" size={13} color="#ffffff" />
+          <Text style={styles.locationText}>{photo.location}</Text>
+        </View>
+        <Text style={styles.dateText}>{photo.date}</Text>
+      </View>
     </View>
   );
 }
@@ -366,6 +407,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000000",
   },
+  zoomCell: {
+    flex: 1,
+  },
   zoomContainer: {
     flex: 1,
   },
@@ -373,25 +417,10 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
-  topBar: {
-    position: "absolute",
-    left: 12,
-    right: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  circleButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "rgba(0, 0, 0, 0.45)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
   locationBadge: {
     position: "absolute",
     right: 16,
+    bottom: 24,
     alignItems: "flex-end",
   },
   locationRow: {
@@ -415,6 +444,33 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0, 0, 0, 0.8)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  topBar: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  circleButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  counterBadge: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  counterText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "700",
   },
   notFoundText: {
     color: "#ffffff",
@@ -501,7 +557,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: palette.surface,
+    backgroundColor: "#1c1c1e",
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 8,
@@ -517,14 +573,11 @@ const styles = StyleSheet.create({
   sheetItemText: {
     fontSize: 16,
     fontWeight: "700",
-    color: palette.text,
-  },
-  sheetItemDanger: {
-    color: palette.danger,
+    color: "#ffffff",
   },
   sheetDivider: {
     height: 1,
-    backgroundColor: palette.border,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
     marginHorizontal: 12,
   },
 });

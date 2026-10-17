@@ -34,7 +34,7 @@ export default function PhotoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = Dimensions.get("window");
+  const { width, height } = Dimensions.get("window");
 
   const [photos, setPhotos] = useState<PhotoMemory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,6 +219,7 @@ export default function PhotoDetailScreen() {
   return (
     <View style={styles.darkScreen}>
       <FlatList
+        style={{ flex: 1 }}
         data={photos}
         horizontal
         pagingEnabled
@@ -233,7 +234,7 @@ export default function PhotoDetailScreen() {
         }}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <View style={{ width }}>
+          <View style={{ width, height }}>
             <ZoomablePhoto photo={item} onZoomChange={setZoomed} />
           </View>
         )}

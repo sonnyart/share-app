@@ -24,7 +24,7 @@ import { getStartDate, setStartDate } from "@/lib/storage";
 import type { PhotoMemory } from "@/lib/types";
 
 const MAX_WIDTH = 440;
-const GAP = 3;
+const GAP = 2;
 
 type GridItem = PhotoMemory | { id: string; isAdd: true };
 
@@ -108,7 +108,7 @@ export default function HomeScreen() {
                 {adding ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Ionicons name="add" size={34} color="#ffffff" />
+                  <Ionicons name="add" size={30} color="#ffffff" />
                 )}
               </Pressable>
             ) : (
@@ -168,9 +168,20 @@ function Hero({
       {loadingDate ? (
         <ActivityIndicator color="#ffffff" style={styles.ddayLoading} />
       ) : startDate ? (
-        <DdayView startDate={startDate} onEdit={onEditDate} />
+        <Pressable style={styles.ddayWrap} onPress={onEditDate}>
+          <Text style={styles.ddayDate}>시작일 {formatKoreanDate(startDate)}</Text>
+          <View style={styles.ddayRow}>
+            <Text style={styles.ddayNumber}>+{daysSince(startDate)}</Text>
+            <Text style={styles.ddayUnit}>일</Text>
+          </View>
+        </Pressable>
       ) : (
-        <FirstRunView onAdd={onEditDate} />
+        <Pressable style={styles.ddayWrap} onPress={onEditDate}>
+          <Text style={styles.ddayDate}>시작일 입력하기</Text>
+          <View style={styles.ddayRow}>
+            <Ionicons name="add" size={22} color="#ffffff" />
+          </View>
+        </Pressable>
       )}
 
       <View style={styles.iconRow}>
@@ -178,32 +189,6 @@ function Hero({
         <IconButton icon="calendar" label="캘린더" onPress={onOpenCalendar} />
         <IconButton icon="heart" label="위시" onPress={onOpenWish} />
       </View>
-    </View>
-  );
-}
-
-function DdayView({ startDate, onEdit }: { startDate: string; onEdit: () => void }) {
-  const days = daysSince(startDate);
-
-  return (
-    <Pressable style={styles.ddayWrap} onPress={onEdit}>
-      <Text style={styles.ddayLabel}>우리 만난 지</Text>
-      <View style={styles.ddayRow}>
-        <Text style={styles.ddayNumber}>+{days}</Text>
-        <Text style={styles.ddayUnit}>일</Text>
-      </View>
-      <Text style={styles.ddayDate}>시작일 {formatKoreanDate(startDate)}</Text>
-    </Pressable>
-  );
-}
-
-function FirstRunView({ onAdd }: { onAdd: () => void }) {
-  return (
-    <View style={styles.ddayWrap}>
-      <Text style={styles.firstRunText}>시작 날짜를 입력해볼까요?</Text>
-      <Pressable style={styles.bigAddButton} onPress={onAdd}>
-        <Ionicons name="add" size={36} color={palette.accentDark} />
-      </Pressable>
     </View>
   );
 }
@@ -219,9 +204,7 @@ function IconButton({
 }) {
   return (
     <Pressable style={styles.iconButton} onPress={onPress}>
-      <View style={styles.iconCircle}>
-        <Ionicons name={icon} size={24} color="#ffffff" />
-      </View>
+      <Ionicons name={icon} size={20} color="#ffffff" />
       <Text style={styles.iconLabel}>{label}</Text>
     </Pressable>
   );
@@ -310,26 +293,28 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   hero: {
-    alignItems: "center",
-    paddingTop: 24,
-    paddingBottom: 28,
-    paddingHorizontal: 20,
+    alignItems: "flex-start",
+    paddingTop: 18,
+    paddingBottom: 18,
+    paddingHorizontal: 16,
   },
   logo: {
     fontFamily: fontFamily.handwriting,
-    fontSize: 46,
+    fontSize: 30,
     color: palette.text,
-    marginBottom: 18,
   },
   ddayLoading: {
-    marginVertical: 28,
+    alignSelf: "center",
+    marginVertical: 20,
   },
   ddayWrap: {
+    alignSelf: "center",
     alignItems: "center",
-    marginBottom: 28,
+    marginTop: 6,
+    marginBottom: 14,
   },
-  ddayLabel: {
-    fontSize: 15,
+  ddayDate: {
+    fontSize: 13,
     color: palette.textMuted,
     fontWeight: "600",
     marginBottom: 4,
@@ -340,58 +325,27 @@ const styles = StyleSheet.create({
   },
   ddayNumber: {
     fontFamily: fontFamily.handwriting,
-    fontSize: 52,
+    fontSize: 26,
     color: palette.text,
   },
   ddayUnit: {
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: "700",
     color: palette.text,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  ddayDate: {
-    fontSize: 13,
-    color: palette.textFaint,
-    fontWeight: "600",
-    marginTop: 6,
-  },
-  firstRunText: {
-    fontSize: 16,
-    color: palette.textMuted,
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  bigAddButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: palette.accent,
-    alignItems: "center",
-    justifyContent: "center",
+    marginBottom: 3,
+    marginLeft: 3,
   },
   iconRow: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: 28,
+    gap: 26,
   },
   iconButton: {
     alignItems: "center",
-    gap: 8,
-  },
-  iconCircle: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: palette.accentSoft,
-    borderWidth: 1,
-    borderColor: palette.border,
-    alignItems: "center",
-    justifyContent: "center",
+    gap: 5,
   },
   iconLabel: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 11,
+    fontWeight: "600",
     color: palette.text,
   },
   gridContent: {
@@ -404,9 +358,6 @@ const styles = StyleSheet.create({
   addTile: {
     flex: 1,
     aspectRatio: 1,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: palette.border,
     backgroundColor: palette.accentSoft,
     alignItems: "center",
     justifyContent: "center",
@@ -414,9 +365,8 @@ const styles = StyleSheet.create({
   cell: {
     flex: 1,
     aspectRatio: 1,
-    borderRadius: 4,
-    overflow: "hidden",
     backgroundColor: palette.surfaceSolid,
+    overflow: "hidden",
   },
   cellImage: {
     width: "100%",

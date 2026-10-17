@@ -24,7 +24,7 @@ import { getStartDate, setStartDate } from "@/lib/storage";
 import type { PhotoMemory } from "@/lib/types";
 
 const MAX_WIDTH = 440;
-const GAP = 2;
+const GAP = 1;
 
 type GridItem = PhotoMemory | { id: string; isAdd: true };
 
@@ -185,9 +185,9 @@ function Hero({
       )}
 
       <View style={styles.iconRow}>
-        <IconButton icon="images" label="사진" onPress={onOpenPhotos} />
-        <IconButton icon="calendar" label="캘린더" onPress={onOpenCalendar} />
-        <IconButton icon="heart" label="위시" onPress={onOpenWish} />
+        <IconButton icon="images" onPress={onOpenPhotos} />
+        <IconButton icon="calendar" onPress={onOpenCalendar} />
+        <IconButton icon="heart" onPress={onOpenWish} />
       </View>
     </View>
   );
@@ -195,17 +195,14 @@ function Hero({
 
 function IconButton({
   icon,
-  label,
   onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
-  label: string;
   onPress: () => void;
 }) {
   return (
-    <Pressable style={styles.iconButton} onPress={onPress}>
+    <Pressable style={styles.iconButton} onPress={onPress} hitSlop={6}>
       <Ionicons name={icon} size={20} color="#ffffff" />
-      <Text style={styles.iconLabel}>{label}</Text>
     </Pressable>
   );
 }
@@ -300,7 +297,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontFamily: fontFamily.handwriting,
-    fontSize: 30,
+    fontSize: 33,
     color: palette.text,
   },
   ddayLoading: {
@@ -321,32 +318,25 @@ const styles = StyleSheet.create({
   },
   ddayRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "baseline",
+    gap: 3,
   },
   ddayNumber: {
-    fontFamily: fontFamily.handwriting,
-    fontSize: 26,
+    fontSize: 24,
+    fontWeight: "600",
     color: palette.text,
   },
   ddayUnit: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "400",
     color: palette.text,
-    marginBottom: 3,
-    marginLeft: 3,
   },
   iconRow: {
     flexDirection: "row",
-    gap: 26,
+    gap: 22,
   },
   iconButton: {
-    alignItems: "center",
-    gap: 5,
-  },
-  iconLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: palette.text,
+    padding: 4,
   },
   gridContent: {
     gap: GAP,

@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   View,
+  ViewToken,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -29,6 +30,7 @@ import type { PhotoMemory } from "@/lib/types";
 const MIN_SCALE = 1;
 const MAX_SCALE = 4;
 const DOUBLE_TAP_SCALE = 2.5;
+const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
 
 export default function PhotoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -44,6 +46,16 @@ export default function PhotoDetailScreen() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      const first = viewableItems[0];
+      if (first && first.index != null) {
+        setIndex(first.index);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     let active = true;
@@ -228,10 +240,8 @@ export default function PhotoDetailScreen() {
         initialScrollIndex={index}
         getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
         onScrollToIndexFailed={() => {}}
-        onMomentumScrollEnd={(e) => {
-          const i = Math.round(e.nativeEvent.contentOffset.x / width);
-          setIndex(Math.max(0, Math.min(photos.length - 1, i)));
-        }}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={VIEWABILITY_CONFIG}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={{ width, height }}>
@@ -423,6 +433,10 @@ const styles = StyleSheet.create({
     right: 16,
     bottom: 24,
     alignItems: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    borderRadius: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
   },
   locationRow: {
     flexDirection: "row",

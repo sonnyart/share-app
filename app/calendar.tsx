@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -242,14 +242,16 @@ function EventFormModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      setTitle(editing?.title ?? "");
-      setDate(editing?.date ?? "");
-      setType(editing?.type ?? "schedule");
-      setError(null);
-    }
-  }, [visible, editing]);
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible && !wasVisible) {
+    setWasVisible(true);
+    setTitle(editing?.title ?? "");
+    setDate(editing?.date ?? "");
+    setType(editing?.type ?? "schedule");
+    setError(null);
+  } else if (!visible && wasVisible) {
+    setWasVisible(false);
+  }
 
   async function handleSave() {
     const trimmedTitle = title.trim();

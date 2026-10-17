@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -219,15 +219,26 @@ function DatePickerModal({
   onClose: () => void;
   onSave: (date: string) => void;
 }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      {visible ? (
+        <DateForm initialValue={initialValue} onClose={onClose} onSave={onSave} />
+      ) : null}
+    </Modal>
+  );
+}
+
+function DateForm({
+  initialValue,
+  onClose,
+  onSave,
+}: {
+  initialValue?: string;
+  onClose: () => void;
+  onSave: (date: string) => void;
+}) {
   const [text, setText] = useState(initialValue ?? "");
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (visible) {
-      setText(initialValue ?? "");
-      setError(null);
-    }
-  }, [visible, initialValue]);
 
   function handleSave() {
     const trimmed = text.trim();
@@ -243,39 +254,37 @@ function DatePickerModal({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.modalBackdrop}>
-        <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>시작 날짜 입력</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={palette.textFaint}
-            value={text}
-            onChangeText={(value) => {
-              setText(value);
-              setError(null);
-            }}
-            keyboardType="numbers-and-punctuation"
-            autoFocus
-          />
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-          <Pressable style={styles.todayButton} onPress={() => setText(todayStr())}>
-            <Text style={styles.todayButtonText}>오늘로 채우기</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      style={styles.modalBackdrop}>
+      <View style={styles.modalCard}>
+        <Text style={styles.modalTitle}>시작 날짜 입력</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={palette.textFaint}
+          value={text}
+          onChangeText={(value) => {
+            setText(value);
+            setError(null);
+          }}
+          keyboardType="numbers-and-punctuation"
+          autoFocus
+        />
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        <Pressable style={styles.todayButton} onPress={() => setText(todayStr())}>
+          <Text style={styles.todayButtonText}>오늘로 채우기</Text>
+        </Pressable>
+        <View style={styles.modalActions}>
+          <Pressable style={styles.cancelButton} onPress={onClose}>
+            <Text style={styles.cancelButtonText}>취소</Text>
           </Pressable>
-          <View style={styles.modalActions}>
-            <Pressable style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelButtonText}>취소</Text>
-            </Pressable>
-            <Pressable style={styles.saveButton} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>저장</Text>
-            </Pressable>
-          </View>
+          <Pressable style={styles.saveButton} onPress={handleSave}>
+            <Text style={styles.saveButtonText}>저장</Text>
+          </Pressable>
         </View>
-      </KeyboardAvoidingView>
-    </Modal>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 

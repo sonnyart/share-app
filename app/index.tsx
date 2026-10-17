@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontFamily: fontFamily.handwriting,
-    fontSize: 33,
+    fontSize: 40,
     color: palette.text,
   },
   ddayLoading: {
@@ -323,13 +323,13 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   ddayNumber: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "600",
     color: palette.text,
   },
   ddayUnit: {
-    fontSize: 15,
-    fontWeight: "400",
+    fontSize: 22,
+    fontWeight: "600",
     color: palette.text,
   },
   iconRow: {

@@ -23,7 +23,8 @@ import { addPhoto, loadPhotos } from "@/lib/photos";
 import { getStartDate, setStartDate } from "@/lib/storage";
 import type { PhotoMemory } from "@/lib/types";
 
-const MAX_WIDTH = 440;
+const MAX_WIDTH = 935;
+const MODAL_MAX_WIDTH = 400;
 const GAP = 1;
 
 type GridItem = PhotoMemory | { id: string; isAdd: true };
@@ -371,7 +372,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: "100%",
-    maxWidth: MAX_WIDTH,
+    maxWidth: MODAL_MAX_WIDTH,
     backgroundColor: palette.surfaceSolid,
     borderRadius: 20,
     padding: 24,

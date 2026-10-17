@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -46,6 +46,7 @@ export default function PhotoDetailScreen() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const listRef = useRef<FlatList<PhotoMemory>>(null);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -89,6 +90,18 @@ export default function PhotoDetailScreen() {
   }, [id]);
 
   const current = photos[index];
+
+  function goPrev() {
+    if (index > 0) {
+      listRef.current?.scrollToIndex({ index: index - 1, animated: true });
+    }
+  }
+
+  function goNext() {
+    if (index < photos.length - 1) {
+      listRef.current?.scrollToIndex({ index: index + 1, animated: true });
+    }
+  }
 
   function toggleSelect(photoId: string) {
     setSelectedIds((prev) => {
@@ -231,6 +244,7 @@ export default function PhotoDetailScreen() {
   return (
     <View style={styles.darkScreen}>
       <FlatList
+        ref={listRef}
         style={{ flex: 1 }}
         data={photos}
         horizontal
@@ -250,24 +264,39 @@ export default function PhotoDetailScreen() {
         )}
       />
 
-      <View style={[styles.topBar, { top: insets.top + 8 }]}>
-        <Pressable style={styles.circleButton} onPress={() => router.back()} hitSlop={8}>
-          <Ionicons name="close" size={26} color="#ffffff" />
-        </Pressable>
+      <Pressable
+        style={[styles.edgeButton, { top: insets.top + 8, left: 8 }]}
+        onPress={() => router.back()}
+        hitSlop={8}>
+        <Ionicons name="close" size={26} color="#ffffff" />
+      </Pressable>
 
+      <Pressable
+        style={[styles.edgeButton, { top: insets.top + 8, right: 8 }]}
+        onPress={() => setMenuVisible(true)}
+        hitSlop={8}>
+        <Ionicons name="ellipsis-horizontal" size={22} color="#ffffff" />
+      </Pressable>
+
+      <View style={[styles.counterWrap, { top: insets.top + 12 }]} pointerEvents="none">
         <View style={styles.counterBadge}>
           <Text style={styles.counterText}>
             {index + 1} / {photos.length}
           </Text>
         </View>
-
-        <Pressable
-          style={styles.circleButton}
-          onPress={() => setMenuVisible(true)}
-          hitSlop={8}>
-          <Ionicons name="ellipsis-horizontal" size={22} color="#ffffff" />
-        </Pressable>
       </View>
+
+      {index > 0 ? (
+        <Pressable style={[styles.sideButton, { left: 8 }]} onPress={goPrev} hitSlop={8}>
+          <Ionicons name="chevron-back" size={24} color="#ffffff" />
+        </Pressable>
+      ) : null}
+
+      {index < photos.length - 1 ? (
+        <Pressable style={[styles.sideButton, { right: 8 }]} onPress={goNext} hitSlop={8}>
+          <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+        </Pressable>
+      ) : null}
 
       <Modal
         visible={menuVisible}
@@ -430,9 +459,9 @@ const styles = StyleSheet.create({
   },
   locationBadge: {
     position: "absolute",
-    right: 16,
+    left: 16,
     bottom: 24,
-    alignItems: "flex-end",
+    alignItems: "flex-start",
     backgroundColor: "rgba(0, 0, 0, 0.45)",
     borderRadius: 10,
     paddingVertical: 6,
@@ -460,15 +489,8 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
-  topBar: {
+  edgeButton: {
     position: "absolute",
-    left: 12,
-    right: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  circleButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -476,11 +498,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  counterWrap: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
   counterBadge: {
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 999,
     backgroundColor: "rgba(0, 0, 0, 0.45)",
+  },
+  sideButton: {
+    position: "absolute",
+    top: "50%",
+    marginTop: -22,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   counterText: {
     color: "#ffffff",

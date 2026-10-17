@@ -14,6 +14,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -28,10 +29,9 @@ const MAX_WIDTH = 935;
 const MODAL_MAX_WIDTH = 400;
 const GAP = 1;
 
-type GridItem = PhotoMemory | { id: string; isAdd: true };
-
 export default function HomeScreen() {
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
   const [startDate, setStartDateState] = useState<string | null>(null);
   const [loadingDate, setLoadingDate] = useState(true);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -95,13 +95,15 @@ export default function HomeScreen() {
     refreshAll().finally(() => setRefreshing(false));
   }
 
-  const data: GridItem[] = [{ id: "__add__", isAdd: true }, ...photos];
+  const gridWidth = Math.min(windowWidth, MAX_WIDTH);
+  const cellWidth = Math.max((gridWidth - 2 * GAP) / 3, 0);
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
       <View style={styles.column}>
         <FlatList
-          data={data}
+          style={styles.list}
+          data={photos}
           keyExtractor={(item) => item.id}
           numColumns={3}
           contentContainerStyle={styles.gridContent}
@@ -124,36 +126,23 @@ export default function HomeScreen() {
               onOpenWish={() => router.push("/wish")}
             />
           }
-          renderItem={({ item }) =>
-            "isAdd" in item ? (
-              <Pressable
-                style={styles.addTile}
-                onPress={handleAddPhoto}
-                disabled={adding}>
-                {adding ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
-                ) : (
-                  <Ionicons name="add" size={30} color="#ffffff" />
-                )}
-              </Pressable>
-            ) : (
-              <Pressable
-                style={styles.cell}
-                onPress={() =>
-                  router.push({
-                    pathname: "/photo/[id]",
-                    params: { id: item.id },
-                  })
-                }>
-                <Image
-                  source={{ uri: item.image_url }}
-                  style={styles.cellImage}
-                  contentFit="cover"
-                  transition={150}
-                />
-              </Pressable>
-            )
-          }
+          renderItem={({ item }) => (
+            <Pressable
+              style={[styles.cell, { width: cellWidth }]}
+              onPress={() =>
+                router.push({
+                  pathname: "/photo/[id]",
+                  params: { id: item.id },
+                })
+              }>
+              <Image
+                source={{ uri: item.image_url }}
+                style={styles.cellImage}
+                contentFit="cover"
+                transition={150}
+              />
+            </Pressable>
+          )}
         />
       </View>
 
@@ -323,6 +312,9 @@ const styles = StyleSheet.create({
     maxWidth: MAX_WIDTH,
     alignSelf: "center",
   },
+  list: {
+    flex: 1,
+  },
   hero: {
     alignItems: "flex-start",
     paddingTop: 18,
@@ -379,15 +371,7 @@ const styles = StyleSheet.create({
   gridRow: {
     gap: GAP,
   },
-  addTile: {
-    flex: 1,
-    aspectRatio: 1,
-    backgroundColor: palette.accentSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   cell: {
-    flex: 1,
     aspectRatio: 1,
     backgroundColor: palette.surfaceSolid,
     overflow: "hidden",

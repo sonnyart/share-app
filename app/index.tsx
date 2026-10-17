@@ -10,6 +10,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -36,6 +37,7 @@ export default function HomeScreen() {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [photos, setPhotos] = useState<PhotoMemory[]>([]);
   const [adding, setAdding] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -79,6 +81,20 @@ export default function HomeScreen() {
     }
   }
 
+  async function refreshAll() {
+    const [saved, photoList] = await Promise.all([
+      getStartDate(),
+      loadPhotos().catch(() => [] as PhotoMemory[]),
+    ]);
+    setStartDateState(saved);
+    setPhotos(photoList);
+  }
+
+  function handleRefresh() {
+    setRefreshing(true);
+    refreshAll().finally(() => setRefreshing(false));
+  }
+
   const data: GridItem[] = [{ id: "__add__", isAdd: true }, ...photos];
 
   return (
@@ -90,12 +106,20 @@ export default function HomeScreen() {
           numColumns={3}
           contentContainerStyle={styles.gridContent}
           columnWrapperStyle={styles.gridRow}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor="#ffffff"
+              colors={["#ffffff"]}
+            />
+          }
           ListHeaderComponent={
             <Hero
               startDate={startDate}
               loadingDate={loadingDate}
               onEditDate={() => setPickerVisible(true)}
-              onOpenPhotos={() => router.push("/photos")}
+              onAddPhoto={handleAddPhoto}
               onOpenCalendar={() => router.push("/calendar")}
               onOpenWish={() => router.push("/wish")}
             />
@@ -151,14 +175,14 @@ function Hero({
   startDate,
   loadingDate,
   onEditDate,
-  onOpenPhotos,
+  onAddPhoto,
   onOpenCalendar,
   onOpenWish,
 }: {
   startDate: string | null;
   loadingDate: boolean;
   onEditDate: () => void;
-  onOpenPhotos: () => void;
+  onAddPhoto: () => void;
   onOpenCalendar: () => void;
   onOpenWish: () => void;
 }) {
@@ -186,7 +210,7 @@ function Hero({
       )}
 
       <View style={styles.iconRow}>
-        <IconButton icon="images" onPress={onOpenPhotos} />
+        <IconButton icon="add-circle" onPress={onAddPhoto} />
         <IconButton icon="calendar" onPress={onOpenCalendar} />
         <IconButton icon="heart" onPress={onOpenWish} />
       </View>

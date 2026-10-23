@@ -79,8 +79,10 @@ async function getPhotoLocationText(exif: any): Promise<string> {
   }
 }
 
-/** 사진 선택 → Storage 업로드 → DB 저장. 취소 시 null 반환 */
-export async function addPhoto(): Promise<PhotoMemory | null> {
+/** 사진 선택 → Storage 업로드 → DB 저장. 최대 10장, 취소 시 빈 배열 반환 */
+const MAX_PHOTOS = 10;
+
+export async function addPhotos(): Promise<PhotoMemory[]> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
   if (permission.status !== "granted") {
@@ -89,58 +91,67 @@ export async function addPhoto(): Promise<PhotoMemory | null> {
 
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
+    allowsMultipleSelection: true,
+    selectionLimit: MAX_PHOTOS,
     quality: 0.8,
     exif: true,
   });
 
   if (result.canceled) {
-    return null;
+    return [];
   }
 
-  const asset = result.assets[0];
+  const assets = result.assets.slice(0, MAX_PHOTOS);
+  const added: PhotoMemory[] = [];
 
-  const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
+  for (let i = 0; i < assets.length; i++) {
+    const asset = assets[i];
 
-  const arrayBuffer = decode(base64);
-  const filePath = `${Date.now()}.jpg`;
-
-  const { error: uploadError } = await supabase.storage
-    .from("photos")
-    .upload(filePath, arrayBuffer, {
-      contentType: "image/jpeg",
-      upsert: false,
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+      encoding: FileSystem.EncodingType.Base64,
     });
 
-  if (uploadError) {
-    throw new Error(`사진 업로드 실패: ${uploadError.message}`);
+    const arrayBuffer = decode(base64);
+    const filePath = `${Date.now()}-${i}.jpg`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("photos")
+      .upload(filePath, arrayBuffer, {
+        contentType: "image/jpeg",
+        upsert: false,
+      });
+
+    if (uploadError) {
+      throw new Error(`사진 업로드 실패: ${uploadError.message}`);
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("photos")
+      .getPublicUrl(filePath);
+
+    const imageUrl = publicUrlData.publicUrl;
+    const photoDate = getPhotoDateFromExif(asset.exif);
+    const location = await getPhotoLocationText(asset.exif);
+
+    const { data: inserted, error: insertError } = await supabase
+      .from("photos")
+      .insert({
+        image_url: imageUrl,
+        file_path: filePath,
+        date: photoDate,
+        location,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      throw new Error(`사진 저장 실패: ${insertError.message}`);
+    }
+
+    added.push(inserted as PhotoMemory);
   }
 
-  const { data: publicUrlData } = supabase.storage
-    .from("photos")
-    .getPublicUrl(filePath);
-
-  const imageUrl = publicUrlData.publicUrl;
-  const photoDate = getPhotoDateFromExif(asset.exif);
-  const location = await getPhotoLocationText(asset.exif);
-
-  const { data: inserted, error: insertError } = await supabase
-    .from("photos")
-    .insert({
-      image_url: imageUrl,
-      file_path: filePath,
-      date: photoDate,
-      location,
-    })
-    .select()
-    .single();
-
-  if (insertError) {
-    throw new Error(`사진 저장 실패: ${insertError.message}`);
-  }
-
-  return inserted as PhotoMemory;
+  return added;
 }
 
 /** 여러 사진을 한 번에 삭제 (Storage + DB) */

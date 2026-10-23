@@ -21,7 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { fontFamily, palette } from "@/constants/theme";
 import { daysSince, formatKoreanDate, isValidDateStr, todayStr } from "@/lib/dates";
-import { addPhoto, loadPhotos } from "@/lib/photos";
+import { addPhotos, loadPhotos } from "@/lib/photos";
 import { getStartDate, setStartDate } from "@/lib/storage";
 import type { PhotoMemory } from "@/lib/types";
 
@@ -67,8 +67,8 @@ export default function HomeScreen() {
     }
     setAdding(true);
     try {
-      const added = await addPhoto();
-      if (added) {
+      const added = await addPhotos();
+      if (added.length > 0) {
         setPhotos(await loadPhotos());
       }
     } catch (error) {

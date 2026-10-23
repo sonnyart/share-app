@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { palette } from "@/constants/theme";
-import { addPhoto, loadPhotos } from "@/lib/photos";
+import { addPhotos, loadPhotos } from "@/lib/photos";
 import type { PhotoMemory } from "@/lib/types";
 
 const GAP = 3;
@@ -61,8 +61,8 @@ export default function PhotosScreen() {
     }
     setBusy(true);
     try {
-      const added = await addPhoto();
-      if (added) {
+      const added = await addPhotos();
+      if (added.length > 0) {
         setPhotos(await loadPhotos());
       }
     } catch (error) {

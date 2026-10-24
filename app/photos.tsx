@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { palette } from "@/constants/theme";
+import { contentMaxWidth, palette } from "@/constants/theme";
 import { showAlert } from "@/lib/dialog";
 import { addPhotos, loadPhotos } from "@/lib/photos";
 import type { PhotoMemory } from "@/lib/types";
@@ -77,7 +77,8 @@ export default function PhotosScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["top"]}>
-      <View style={styles.header}>
+      <View style={styles.column}>
+        <View style={styles.header}>
         <Pressable style={styles.headerButton} onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="chevron-back" size={26} color="#ffffff" />
         </Pressable>
@@ -131,6 +132,7 @@ export default function PhotosScreen() {
           )}
         />
       )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -139,6 +141,12 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: palette.background,
+  },
+  column: {
+    flex: 1,
+    width: "100%",
+    maxWidth: contentMaxWidth,
+    alignSelf: "center",
   },
   header: {
     flexDirection: "row",

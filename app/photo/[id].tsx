@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { palette } from "@/constants/theme";
 import { confirmDialog, showAlert } from "@/lib/dialog";
-import { deletePhotos, loadPhotos } from "@/lib/photos";
+import { deletePhotos, loadPhotos, replacePhoto } from "@/lib/photos";
 import type { PhotoMemory } from "@/lib/types";
 
 const MIN_SCALE = 1;
@@ -150,6 +150,27 @@ export default function PhotoDetailScreen() {
         }
       },
     });
+  }
+
+  async function handleReplacePhoto() {
+    if (!current) {
+      return;
+    }
+    setMenuVisible(false);
+    setBusy(true);
+    try {
+      const updated = await replacePhoto(current);
+      if (updated) {
+        setPhotos((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+      }
+    } catch (error) {
+      showAlert(
+        "사진 수정 오류",
+        error instanceof Error ? error.message : "알 수 없는 오류"
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   const selected = photos.filter((p) => selectedIds.has(p.id));
@@ -310,6 +331,13 @@ export default function PhotoDetailScreen() {
               }}>
               <Ionicons name="checkmark-circle-outline" size={22} color="#ffffff" />
               <Text style={styles.sheetItemText}>사진 선택</Text>
+            </Pressable>
+
+            <View style={styles.sheetDivider} />
+
+            <Pressable style={styles.sheetItem} onPress={handleReplacePhoto}>
+              <Ionicons name="swap-horizontal" size={22} color="#ffffff" />
+              <Text style={styles.sheetItemText}>다른 사진으로 수정</Text>
             </Pressable>
 
             <View style={styles.sheetDivider} />

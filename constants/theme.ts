@@ -49,6 +49,9 @@ export const fontFamily = {
   handwriting: 'Pacifico_400Regular',
 } as const;
 
+/** 웹에서 콘텐츠를 중앙 정렬할 최대 폭 (인스타 웹 기준) */
+export const contentMaxWidth = 935;
+
 export const Fonts = Platform.select({
   ios: {
     /** iOS `UIFontDescriptorSystemDesignDefault` */

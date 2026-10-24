@@ -164,6 +164,76 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
   return added;
 }
 
+/** 사진 한 장을 다른 사진으로 교체 (같은 id 유지, 새 파일 업로드 + 기존 파일 삭제). 취소 시 null */
+export async function replacePhoto(photo: PhotoMemory): Promise<PhotoMemory | null> {
+  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+  if (permission.status !== "granted") {
+    throw new Error("사진 접근 권한이 필요해요.");
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    quality: 0.8,
+    exif: true,
+  });
+
+  if (result.canceled) {
+    return null;
+  }
+
+  const asset = result.assets[0];
+  const arrayBuffer = await readFileAsArrayBuffer(asset.uri);
+  const filePath = `${Date.now()}-replace.jpg`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("photos")
+    .upload(filePath, arrayBuffer, {
+      contentType: "image/jpeg",
+      upsert: false,
+    });
+
+  if (uploadError) {
+    throw new Error(`사진 업로드 실패: ${uploadError.message}`);
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from("photos")
+    .getPublicUrl(filePath);
+
+  const imageUrl = publicUrlData.publicUrl;
+  const photoDate = getPhotoDateFromExif(asset.exif);
+  const location = await getPhotoLocationText(asset.exif);
+
+  const { data: updated, error: updateError } = await supabase
+    .from("photos")
+    .update({
+      image_url: imageUrl,
+      file_path: filePath,
+      date: photoDate,
+      location,
+    })
+    .eq("id", photo.id)
+    .select()
+    .single();
+
+  if (updateError) {
+    throw new Error(`사진 수정 실패: ${updateError.message}`);
+  }
+
+  if (photo.file_path) {
+    const { error: removeError } = await supabase.storage
+      .from("photos")
+      .remove([photo.file_path]);
+
+    if (removeError) {
+      console.log("기존 파일 삭제 실패(무시):", removeError.message);
+    }
+  }
+
+  return updated as PhotoMemory;
+}
+
 /** 여러 사진을 한 번에 삭제 (Storage + DB) */
 export async function deletePhotos(photos: PhotoMemory[]): Promise<void> {
   const paths = photos.map((p) => p.file_path).filter(Boolean);

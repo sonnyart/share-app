@@ -3,7 +3,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -23,6 +22,7 @@ import {
   type EventInput,
 } from "@/lib/calendar";
 import { formatKoreanDate, isPastDate, isValidDateStr, todayStr } from "@/lib/dates";
+import { confirmDialog, showAlert } from "@/lib/dialog";
 import type { CalendarEvent, CalendarEventType } from "@/lib/types";
 
 export default function CalendarScreen() {
@@ -37,7 +37,7 @@ export default function CalendarScreen() {
       const data = await loadEvents();
       setEvents(data);
     } catch (error) {
-      Alert.alert(
+      showAlert(
         "일정 불러오기 오류",
         error instanceof Error ? error.message : "알 수 없는 오류"
       );
@@ -63,24 +63,21 @@ export default function CalendarScreen() {
   }
 
   function handleDelete(event: CalendarEvent) {
-    Alert.alert("일정 삭제", `"${event.title}" 일정을 삭제할까요?`, [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteEvent(event.id);
-            setEvents((prev) => prev.filter((e) => e.id !== event.id));
-          } catch (error) {
-            Alert.alert(
-              "삭제 오류",
-              error instanceof Error ? error.message : "알 수 없는 오류"
-            );
-          }
-        },
+    confirmDialog("일정 삭제", `"${event.title}" 일정을 삭제할까요?`, {
+      confirmText: "삭제",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteEvent(event.id);
+          setEvents((prev) => prev.filter((e) => e.id !== event.id));
+        } catch (error) {
+          showAlert(
+            "삭제 오류",
+            error instanceof Error ? error.message : "알 수 없는 오류"
+          );
+        }
       },
-    ]);
+    });
   }
 
   const today = todayStr();
@@ -167,7 +164,7 @@ export default function CalendarScreen() {
             setLoading(true);
             await refresh();
           } catch (error) {
-            Alert.alert(
+            showAlert(
               "저장 오류",
               error instanceof Error ? error.message : "알 수 없는 오류"
             );

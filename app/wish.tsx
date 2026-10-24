@@ -3,7 +3,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -15,6 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { palette } from "@/constants/theme";
+import { confirmDialog, showAlert } from "@/lib/dialog";
 import type { WishItem } from "@/lib/types";
 import {
   addWish,
@@ -39,7 +39,7 @@ export default function WishScreen() {
       const data = await loadWishes();
       setWishes(data);
     } catch (error) {
-      Alert.alert(
+      showAlert(
         "위시 불러오기 오류",
         error instanceof Error ? error.message : "알 수 없는 오류"
       );
@@ -65,7 +65,7 @@ export default function WishScreen() {
       setDraft("");
       setWishes(await loadWishes());
     } catch (error) {
-      Alert.alert(
+      showAlert(
         "추가 오류",
         error instanceof Error ? error.message : "알 수 없는 오류"
       );
@@ -81,7 +81,7 @@ export default function WishScreen() {
         prev.map((w) => (w.id === wish.id ? { ...w, done: !w.done } : w))
       );
     } catch (error) {
-      Alert.alert(
+      showAlert(
         "저장 오류",
         error instanceof Error ? error.message : "알 수 없는 오류"
       );
@@ -106,7 +106,7 @@ export default function WishScreen() {
         prev.map((w) => (w.id === editing.id ? { ...w, text } : w))
       );
     } catch (error) {
-      Alert.alert(
+      showAlert(
         "수정 오류",
         error instanceof Error ? error.message : "알 수 없는 오류"
       );
@@ -114,24 +114,21 @@ export default function WishScreen() {
   }
 
   function handleDelete(wish: WishItem) {
-    Alert.alert("위시 삭제", `"${wish.text}" 항목을 삭제할까요?`, [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteWish(wish.id);
-            setWishes((prev) => prev.filter((w) => w.id !== wish.id));
-          } catch (error) {
-            Alert.alert(
-              "삭제 오류",
-              error instanceof Error ? error.message : "알 수 없는 오류"
-            );
-          }
-        },
+    confirmDialog("위시 삭제", `"${wish.text}" 항목을 삭제할까요?`, {
+      confirmText: "삭제",
+      destructive: true,
+      onConfirm: async () => {
+        try {
+          await deleteWish(wish.id);
+          setWishes((prev) => prev.filter((w) => w.id !== wish.id));
+        } catch (error) {
+          showAlert(
+            "삭제 오류",
+            error instanceof Error ? error.message : "알 수 없는 오류"
+          );
+        }
       },
-    ]);
+    });
   }
 
   const doneCount = wishes.filter((w) => w.done).length;

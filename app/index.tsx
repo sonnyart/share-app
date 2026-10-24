@@ -4,7 +4,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -21,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { fontFamily, palette } from "@/constants/theme";
 import { daysSince, formatKoreanDate, isValidDateStr, todayStr } from "@/lib/dates";
+import { showAlert } from "@/lib/dialog";
 import { addPhotos, loadPhotos } from "@/lib/photos";
 import { getStartDate, setStartDate } from "@/lib/storage";
 import type { PhotoMemory } from "@/lib/types";
@@ -72,7 +72,7 @@ export default function HomeScreen() {
         setPhotos(await loadPhotos());
       }
     } catch (error) {
-      Alert.alert(
+      showAlert(
         "사진 추가 오류",
         error instanceof Error ? error.message : "알 수 없는 오류"
       );

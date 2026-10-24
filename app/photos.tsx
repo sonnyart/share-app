@@ -4,7 +4,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -14,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { palette } from "@/constants/theme";
+import { showAlert } from "@/lib/dialog";
 import { addPhotos, loadPhotos } from "@/lib/photos";
 import type { PhotoMemory } from "@/lib/types";
 
@@ -37,7 +37,7 @@ export default function PhotosScreen() {
           }
         } catch (error) {
           if (active) {
-            Alert.alert(
+            showAlert(
               "사진 불러오기 오류",
               error instanceof Error ? error.message : "알 수 없는 오류"
             );
@@ -66,7 +66,7 @@ export default function PhotosScreen() {
         setPhotos(await loadPhotos());
       }
     } catch (error) {
-      Alert.alert(
+      showAlert(
         "사진 추가 오류",
         error instanceof Error ? error.message : "알 수 없는 오류"
       );

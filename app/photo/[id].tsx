@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   FlatList,
   Modal,
@@ -24,6 +23,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { palette } from "@/constants/theme";
+import { confirmDialog, showAlert } from "@/lib/dialog";
 import { deletePhotos, loadPhotos } from "@/lib/photos";
 import type { PhotoMemory } from "@/lib/types";
 
@@ -72,7 +72,7 @@ export default function PhotoDetailScreen() {
       })
       .catch((error) => {
         if (active) {
-          Alert.alert(
+          showAlert(
             "사진 불러오기 오류",
             error instanceof Error ? error.message : "알 수 없는 오류"
           );
@@ -120,39 +120,36 @@ export default function PhotoDetailScreen() {
       return;
     }
 
-    Alert.alert("사진 삭제", `${targets.length}장의 사진을 삭제할까요?`, [
-      { text: "취소", style: "cancel" },
-      {
-        text: "삭제",
-        style: "destructive",
-        onPress: async () => {
-          setBusy(true);
-          try {
-            await deletePhotos(targets);
-            const currentDeleted = targets.some((t) => t.id === current?.id);
+    confirmDialog("사진 삭제", `${targets.length}장의 사진을 삭제할까요?`, {
+      confirmText: "삭제",
+      destructive: true,
+      onConfirm: async () => {
+        setBusy(true);
+        try {
+          await deletePhotos(targets);
+          const currentDeleted = targets.some((t) => t.id === current?.id);
 
-            if (currentDeleted) {
-              router.back();
-              return;
-            }
-
-            const remaining = photos.filter(
-              (p) => !targets.some((t) => t.id === p.id)
-            );
-            setPhotos(remaining);
-            setSelectMode(false);
-            setSelectedIds(new Set());
-          } catch (error) {
-            Alert.alert(
-              "삭제 오류",
-              error instanceof Error ? error.message : "알 수 없는 오류"
-            );
-          } finally {
-            setBusy(false);
+          if (currentDeleted) {
+            router.back();
+            return;
           }
-        },
+
+          const remaining = photos.filter(
+            (p) => !targets.some((t) => t.id === p.id)
+          );
+          setPhotos(remaining);
+          setSelectMode(false);
+          setSelectedIds(new Set());
+        } catch (error) {
+          showAlert(
+            "삭제 오류",
+            error instanceof Error ? error.message : "알 수 없는 오류"
+          );
+        } finally {
+          setBusy(false);
+        }
       },
-    ]);
+    });
   }
 
   const selected = photos.filter((p) => selectedIds.has(p.id));

@@ -99,7 +99,12 @@ export default function HomeScreen() {
   const cellWidth = Math.max((gridWidth - 2 * GAP) / 3, 0);
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top"]}>
+    <SafeAreaView
+      style={[
+        styles.screen,
+        Platform.OS === "web" && ({ height: "100dvh", flex: 0 } as any),
+      ]}
+      edges={["top"]}>
       <View style={styles.column}>
         <ScrollView
           style={styles.list}
@@ -305,14 +310,12 @@ const styles = StyleSheet.create({
   },
   column: {
     flex: 1,
-    height: "100%",
     width: "100%",
     maxWidth: MAX_WIDTH,
     alignSelf: "center",
   },
   list: {
     flex: 1,
-    height: "100%",
   },
   hero: {
     alignItems: "flex-start",

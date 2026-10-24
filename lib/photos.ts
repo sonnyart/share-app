@@ -2,6 +2,7 @@ import { decode } from "base64-arraybuffer";
 import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
+import { Platform } from "react-native";
 
 import { supabase } from "@/lib/supabase";
 import type { PhotoMemory } from "@/lib/types";
@@ -79,6 +80,19 @@ async function getPhotoLocationText(exif: any): Promise<string> {
   }
 }
 
+/** 웹/네이티브 공통으로 파일을 ArrayBuffer로 읽기 (웹은 fetch, 네이티브는 FileSystem) */
+async function readFileAsArrayBuffer(uri: string): Promise<ArrayBuffer> {
+  if (Platform.OS === "web") {
+    const res = await fetch(uri);
+    return await res.arrayBuffer();
+  }
+
+  const base64 = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return decode(base64);
+}
+
 /** 사진 선택 → Storage 업로드 → DB 저장. 최대 10장, 취소 시 빈 배열 반환 */
 const MAX_PHOTOS = 10;
 
@@ -107,11 +121,7 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
   for (let i = 0; i < assets.length; i++) {
     const asset = assets[i];
 
-    const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    const arrayBuffer = decode(base64);
+    const arrayBuffer = await readFileAsArrayBuffer(asset.uri);
     const filePath = `${Date.now()}-${i}.jpg`;
 
     const { error: uploadError } = await supabase.storage

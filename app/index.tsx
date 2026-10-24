@@ -102,7 +102,9 @@ export default function HomeScreen() {
     <SafeAreaView
       style={[
         styles.screen,
-        Platform.OS === "web" && ({ height: "100dvh", flex: 0 } as any),
+        Platform.OS === "web"
+          ? ({ height: "100dvh", width: "100%" } as any)
+          : { flex: 1 },
       ]}
       edges={["top"]}>
       <View style={styles.column}>
@@ -305,7 +307,6 @@ function DateForm({
 
 const styles = StyleSheet.create({
   screen: {
-    flex: 1,
     backgroundColor: palette.background,
   },
   column: {

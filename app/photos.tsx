@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { contentMaxWidth, palette } from "@/constants/theme";
 import { showAlert } from "@/lib/dialog";
-import { addPhotos, loadPhotos } from "@/lib/photos";
+import { addPhotos, groupPhotos, loadPhotos } from "@/lib/photos";
 import type { PhotoMemory } from "@/lib/types";
 
 const GAP = 3;
@@ -108,28 +108,37 @@ export default function PhotosScreen() {
         </View>
       ) : (
         <FlatList
-          data={photos}
-          keyExtractor={(item) => item.id}
+          data={groupPhotos(photos)}
+          keyExtractor={(item) => item.key}
           numColumns={3}
           contentContainerStyle={styles.gridContent}
           columnWrapperStyle={styles.gridRow}
-          renderItem={({ item }) => (
-            <Pressable
-              style={styles.cell}
-              onPress={() =>
-                router.push({
-                  pathname: "/photo/[id]",
-                  params: { id: item.id },
-                })
-              }>
-              <Image
-                source={{ uri: item.image_url }}
-                style={styles.cellImage}
-                contentFit="cover"
-                transition={150}
-              />
-            </Pressable>
-          )}
+          renderItem={({ item }) => {
+            const thumb = item.photos[0];
+            const isMulti = item.photos.length > 1;
+            return (
+              <Pressable
+                style={styles.cell}
+                onPress={() =>
+                  router.push({
+                    pathname: "/photo/[id]",
+                    params: { id: item.key },
+                  })
+                }>
+                <Image
+                  source={{ uri: thumb.image_url }}
+                  style={styles.cellImage}
+                  contentFit="cover"
+                  transition={150}
+                />
+                {isMulti ? (
+                  <View style={styles.stackedBadge}>
+                    <Ionicons name="copy" size={13} color="#ffffff" />
+                  </View>
+                ) : null}
+              </Pressable>
+            );
+          }}
         />
       )}
       </View>
@@ -204,5 +213,16 @@ const styles = StyleSheet.create({
   cellImage: {
     width: "100%",
     height: "100%",
+  },
+  stackedBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

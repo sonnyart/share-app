@@ -21,7 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { fontFamily, palette } from "@/constants/theme";
 import { daysSince, formatKoreanDate, isValidDateStr, todayStr } from "@/lib/dates";
 import { showAlert } from "@/lib/dialog";
-import { addPhotos, loadPhotos } from "@/lib/photos";
+import { addPhotos, groupPhotos, loadPhotos } from "@/lib/photos";
 import { getStartDate, setStartDate } from "@/lib/storage";
 import type { PhotoMemory } from "@/lib/types";
 
@@ -128,24 +128,33 @@ export default function HomeScreen() {
             onOpenWish={() => router.push("/wish")}
           />
           <View style={styles.grid}>
-            {photos.map((photo) => (
-              <Pressable
-                key={photo.id}
-                style={[styles.cell, { width: cellWidth }]}
-                onPress={() =>
-                  router.push({
-                    pathname: "/photo/[id]",
-                    params: { id: photo.id },
-                  })
-                }>
-                <Image
-                  source={{ uri: photo.image_url }}
-                  style={styles.cellImage}
-                  contentFit="cover"
-                  transition={150}
-                />
-              </Pressable>
-            ))}
+            {groupPhotos(photos).map((group) => {
+              const thumb = group.photos[0];
+              const isMulti = group.photos.length > 1;
+              return (
+                <Pressable
+                  key={group.key}
+                  style={[styles.cell, { width: cellWidth }]}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/photo/[id]",
+                      params: { id: group.key },
+                    })
+                  }>
+                  <Image
+                    source={{ uri: thumb.image_url }}
+                    style={styles.cellImage}
+                    contentFit="cover"
+                    transition={150}
+                  />
+                  {isMulti ? (
+                    <View style={styles.stackedBadge}>
+                      <Ionicons name="copy" size={13} color="#ffffff" />
+                    </View>
+                  ) : null}
+                </Pressable>
+              );
+            })}
           </View>
         </ScrollView>
       </View>
@@ -383,6 +392,17 @@ const styles = StyleSheet.create({
   cellImage: {
     width: "100%",
     height: "100%",
+  },
+  stackedBadge: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalBackdrop: {
     flex: 1,

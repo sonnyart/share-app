@@ -4,6 +4,12 @@ export type PhotoMemory = {
   file_path: string;
   date: string;
   location: string;
+  group_id?: string | null;
+};
+
+export type PhotoGroup = {
+  key: string;
+  photos: PhotoMemory[];
 };
 
 export type CalendarEventType = "schedule" | "anniversary";

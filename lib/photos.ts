@@ -5,7 +5,7 @@ import * as Location from "expo-location";
 import { Platform } from "react-native";
 
 import { supabase } from "@/lib/supabase";
-import type { PhotoMemory } from "@/lib/types";
+import type { PhotoGroup, PhotoMemory } from "@/lib/types";
 
 /** 사진 전체 목록 (최신순) */
 export async function loadPhotos(): Promise<PhotoMemory[]> {
@@ -19,6 +19,24 @@ export async function loadPhotos(): Promise<PhotoMemory[]> {
   }
 
   return (data ?? []) as PhotoMemory[];
+}
+
+/** 사진을 한 페이지(그룹) 단위로 묶기. group_id가 있으면 그룹, 없으면(옛 사진) 낱장 처리 */
+export function groupPhotos(photos: PhotoMemory[]): PhotoGroup[] {
+  const map = new Map<string, PhotoMemory[]>();
+
+  for (const photo of photos) {
+    const key = photo.group_id ?? photo.id;
+    const list = map.get(key) ?? [];
+    list.push(photo);
+    map.set(key, list);
+  }
+
+  return [...map.entries()].map(([key, list]) => ({ key, photos: list }));
+}
+
+function genId(): string {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function formatPhotoDate(date: Date): string {
@@ -116,6 +134,7 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
   }
 
   const assets = result.assets.slice(0, MAX_PHOTOS);
+  const groupId = genId();
   const added: PhotoMemory[] = [];
 
   for (let i = 0; i < assets.length; i++) {
@@ -150,6 +169,7 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
         file_path: filePath,
         date: photoDate,
         location,
+        group_id: groupId,
       })
       .select()
       .single();

@@ -66,9 +66,9 @@ export default function PhotoDetailScreen() {
         if (!active) {
           return;
         }
-        const i = data.findIndex((p) => p.id === id);
-        setPhotos(data);
-        setIndex(i >= 0 ? i : 0);
+        const matching = data.filter((p) => p.group_id === id || p.id === id);
+        setPhotos(matching.length > 0 ? matching : data);
+        setIndex(0);
       })
       .catch((error) => {
         if (active) {

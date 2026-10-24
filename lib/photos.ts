@@ -35,8 +35,13 @@ export function groupPhotos(photos: PhotoMemory[]): PhotoGroup[] {
   return [...map.entries()].map(([key, list]) => ({ key, photos: list }));
 }
 
+/** group_id 컬럼이 uuid 타입이라, 유효한 UUID v4를 생성해야 함 */
 function genId(): string {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
 
 function formatPhotoDate(date: Date): string {

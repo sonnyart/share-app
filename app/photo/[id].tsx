@@ -32,6 +32,25 @@ const MAX_SCALE = 4;
 const DOUBLE_TAP_SCALE = 2.5;
 const VIEWABILITY_CONFIG = { itemVisiblePercentThreshold: 60 };
 
+/** contain 핏으로 렌더링된 사진의 실제 표시 영역(빨간 테두리) 계산 */
+function computePhotoRect(
+  size: { w: number; h: number } | undefined,
+  cellW: number,
+  cellH: number
+) {
+  if (!size || size.w <= 0 || size.h <= 0) {
+    return { left: 0, top: 0, right: cellW, bottom: cellH };
+  }
+
+  const scale = Math.min(cellW / size.w, cellH / size.h);
+  const dispW = size.w * scale;
+  const dispH = size.h * scale;
+  const left = (cellW - dispW) / 2;
+  const top = (cellH - dispH) / 2;
+
+  return { left, top, right: left + dispW, bottom: top + dispH };
+}
+
 export default function PhotoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -47,6 +66,19 @@ export default function PhotoDetailScreen() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const listRef = useRef<FlatList<PhotoMemory>>(null);
+  const [imageSizes, setImageSizes] = useState<Record<string, { w: number; h: number }>>(
+    {}
+  );
+
+  const handleImageSize = useCallback((photoId: string, w: number, h: number) => {
+    setImageSizes((prev) => {
+      const existing = prev[photoId];
+      if (existing && existing.w === w && existing.h === h) {
+        return prev;
+      }
+      return { ...prev, [photoId]: { w, h } };
+    });
+  }, []);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -91,15 +123,31 @@ export default function PhotoDetailScreen() {
 
   const current = photos[index];
 
+  const photoRectFor = useCallback(
+    (photo: PhotoMemory) =>
+      computePhotoRect(imageSizes[photo.id], width, height),
+    [imageSizes, width, height]
+  );
+
+  const photoRect = current
+    ? photoRectFor(current)
+    : { left: 0, top: 0, right: width, bottom: height };
+
   function goPrev() {
     if (index > 0) {
-      listRef.current?.scrollToIndex({ index: index - 1, animated: true });
+      listRef.current?.scrollToOffset({
+        offset: width * (index - 1),
+        animated: true,
+      });
     }
   }
 
   function goNext() {
     if (index < photos.length - 1) {
-      listRef.current?.scrollToIndex({ index: index + 1, animated: true });
+      listRef.current?.scrollToOffset({
+        offset: width * (index + 1),
+        animated: true,
+      });
     }
   }
 
@@ -277,26 +325,48 @@ export default function PhotoDetailScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={{ width, height }}>
-            <ZoomablePhoto photo={item} onZoomChange={setZoomed} />
+            <ZoomablePhoto
+              photo={item}
+              photoRect={photoRectFor(item)}
+              onZoomChange={setZoomed}
+              onImageSize={(w, h) => handleImageSize(item.id, w, h)}
+            />
           </View>
         )}
       />
 
       <Pressable
-        style={[styles.edgeButton, { top: insets.top + 8, left: 8 }]}
+        style={[
+          styles.edgeButton,
+          {
+            top: Math.max(photoRect.top + 8, insets.top + 8),
+            left: photoRect.left + 8,
+          },
+        ]}
         onPress={() => router.back()}
         hitSlop={8}>
         <Ionicons name="close" size={26} color="#ffffff" />
       </Pressable>
 
       <Pressable
-        style={[styles.edgeButton, { top: insets.top + 8, right: 8 }]}
+        style={[
+          styles.edgeButton,
+          {
+            top: Math.max(photoRect.top + 8, insets.top + 8),
+            left: photoRect.right - 8 - 40,
+          },
+        ]}
         onPress={() => setMenuVisible(true)}
         hitSlop={8}>
         <Ionicons name="ellipsis-horizontal" size={22} color="#ffffff" />
       </Pressable>
 
-      <View style={[styles.counterWrap, { top: insets.top + 12 }]} pointerEvents="none">
+      <View
+        style={[
+          styles.counterWrap,
+          { top: Math.max(photoRect.top + 12, insets.top + 12) },
+        ]}
+        pointerEvents="none">
         <View style={styles.counterBadge}>
           <Text style={styles.counterText}>
             {index + 1} / {photos.length}
@@ -305,13 +375,31 @@ export default function PhotoDetailScreen() {
       </View>
 
       {index > 0 ? (
-        <Pressable style={[styles.sideButton, { left: 8 }]} onPress={goPrev} hitSlop={8}>
+        <Pressable
+          style={[
+            styles.sideButton,
+            {
+              left: photoRect.left + 8,
+              top: (photoRect.top + photoRect.bottom) / 2 - 22,
+            },
+          ]}
+          onPress={goPrev}
+          hitSlop={8}>
           <Ionicons name="chevron-back" size={24} color="#ffffff" />
         </Pressable>
       ) : null}
 
       {index < photos.length - 1 ? (
-        <Pressable style={[styles.sideButton, { right: 8 }]} onPress={goNext} hitSlop={8}>
+        <Pressable
+          style={[
+            styles.sideButton,
+            {
+              left: photoRect.right - 8 - 44,
+              top: (photoRect.top + photoRect.bottom) / 2 - 22,
+            },
+          ]}
+          onPress={goNext}
+          hitSlop={8}>
           <Ionicons name="chevron-forward" size={24} color="#ffffff" />
         </Pressable>
       ) : null}
@@ -360,12 +448,17 @@ export default function PhotoDetailScreen() {
 
 function ZoomablePhoto({
   photo,
+  photoRect,
   onZoomChange,
+  onImageSize,
 }: {
   photo: PhotoMemory;
+  photoRect: { left: number; top: number; right: number; bottom: number };
   onZoomChange: (zoomed: boolean) => void;
+  onImageSize?: (w: number, h: number) => void;
 }) {
   const [zoomed, setZoomed] = useState(false);
+  const { height: cellHeight } = Dimensions.get("window");
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -450,11 +543,19 @@ function ZoomablePhoto({
             style={styles.fullImage}
             contentFit="contain"
             transition={150}
+            onLoad={(e) => onImageSize?.(e.source.width, e.source.height)}
           />
         </Animated.View>
       </GestureDetector>
 
-      <View style={styles.locationBadge}>
+      <View
+        style={[
+          styles.locationBadge,
+          {
+            left: photoRect.left + 16,
+            bottom: cellHeight - photoRect.bottom + 24,
+          },
+        ]}>
         <View style={styles.locationRow}>
           <Ionicons name="location" size={13} color="#ffffff" />
           <Text style={styles.locationText}>{photo.location}</Text>
@@ -484,9 +585,7 @@ const styles = StyleSheet.create({
   },
   locationBadge: {
     position: "absolute",
-    right: 16,
-    bottom: 24,
-    alignItems: "flex-end",
+    alignItems: "flex-start",
     backgroundColor: "rgba(0, 0, 0, 0.45)",
     borderRadius: 10,
     paddingVertical: 6,
@@ -537,8 +636,6 @@ const styles = StyleSheet.create({
   },
   sideButton: {
     position: "absolute",
-    top: "50%",
-    marginTop: -22,
     width: 44,
     height: 44,
     borderRadius: 22,

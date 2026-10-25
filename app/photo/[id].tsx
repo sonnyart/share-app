@@ -484,9 +484,9 @@ const styles = StyleSheet.create({
   },
   locationBadge: {
     position: "absolute",
-    left: 16,
+    right: 16,
     bottom: 24,
-    alignItems: "flex-start",
+    alignItems: "flex-end",
     backgroundColor: "rgba(0, 0, 0, 0.45)",
     borderRadius: 10,
     paddingVertical: 6,

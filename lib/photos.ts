@@ -3,7 +3,6 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { Platform } from "react-native";
-import { gps as readGps } from "exifr/dist/mini.umd.js";
 
 import { supabase } from "@/lib/supabase";
 import type { PhotoGroup, PhotoMemory } from "@/lib/types";
@@ -140,35 +139,35 @@ async function reverseGeocodeText(
   }
 }
 
-/** 사진 파일 바이트에서 EXIF GPS 좌표를 읽어 장소명으로. GPS가 없으면 null */
-async function getPhotoLocationText(
-  arrayBuffer: ArrayBuffer
-): Promise<string | null> {
-  let latitude: number;
-  let longitude: number;
+function getGpsNumber(value: any): number | null {
+  if (typeof value === "number") {
+    return value;
+  }
 
-  try {
-    const result = await readGps(arrayBuffer);
+  if (Array.isArray(value) && value.length >= 3) {
+    return value[0] + value[1] / 60 + value[2] / 3600;
+  }
 
-    if (
-      !result ||
-      typeof result.latitude !== "number" ||
-      typeof result.longitude !== "number"
-    ) {
-      return null;
-    }
+  return null;
+}
 
-    latitude = result.latitude;
-    longitude = result.longitude;
-  } catch {
+/** EXIF GPS 좌표를 읽어 장소명으로. GPS가 없거나 (0,0)이면 null */
+async function getPhotoLocationText(exif: any): Promise<string | null> {
+  const latitude = getGpsNumber(exif?.GPSLatitude);
+  const longitude = getGpsNumber(exif?.GPSLongitude);
+
+  if (latitude === null || longitude === null) {
     return null;
   }
 
-  if (latitude === 0 && longitude === 0) {
+  const fixedLatitude = exif?.GPSLatitudeRef === "S" ? -latitude : latitude;
+  const fixedLongitude = exif?.GPSLongitudeRef === "W" ? -longitude : longitude;
+
+  if (fixedLatitude === 0 && fixedLongitude === 0) {
     return null;
   }
 
-  return reverseGeocodeText(latitude, longitude);
+  return reverseGeocodeText(fixedLatitude, fixedLongitude);
 }
 
 /** 사진에 GPS가 없을 때 기기 현재 위치를 장소명으로 (권한 거부/실패 시 null) */
@@ -263,7 +262,7 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
 
     const imageUrl = publicUrlData.publicUrl;
     const photoDate = getPhotoDateFromExif(asset.exif);
-    const exifLocation = await getPhotoLocationText(arrayBuffer);
+    const exifLocation = await getPhotoLocationText(asset.exif);
     const location =
       exifLocation ?? (await getFallbackLocation()) ?? NO_LOCATION;
 
@@ -328,7 +327,7 @@ export async function replacePhoto(photo: PhotoMemory): Promise<PhotoMemory | nu
 
   const imageUrl = publicUrlData.publicUrl;
   const photoDate = getPhotoDateFromExif(asset.exif);
-  const exifLocation = await getPhotoLocationText(arrayBuffer);
+  const exifLocation = await getPhotoLocationText(asset.exif);
   const location =
     exifLocation ?? (await getDeviceLocationText()) ?? NO_LOCATION;
 

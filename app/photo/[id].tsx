@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { palette } from "@/constants/theme";
 import { confirmDialog, showAlert } from "@/lib/dialog";
-import { deletePhotos, loadPhotos, replacePhoto } from "@/lib/photos";
+import { deletePhotos, loadPhotos, NO_LOCATION, replacePhoto } from "@/lib/photos";
 import type { PhotoMemory } from "@/lib/types";
 
 const MIN_SCALE = 1;
@@ -556,10 +556,12 @@ function ZoomablePhoto({
             bottom: cellHeight - photoRect.bottom + 24,
           },
         ]}>
-        <View style={styles.locationRow}>
-          <Ionicons name="location" size={13} color="#ffffff" />
-          <Text style={styles.locationText}>{photo.location}</Text>
-        </View>
+        {photo.location && photo.location !== NO_LOCATION ? (
+          <View style={styles.locationRow}>
+            <Ionicons name="location" size={13} color="#ffffff" />
+            <Text style={styles.locationText}>{photo.location}</Text>
+          </View>
+        ) : null}
         <Text style={styles.dateText}>{photo.date}</Text>
       </View>
     </View>

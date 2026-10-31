@@ -21,7 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { fontFamily, palette } from "@/constants/theme";
 import { daysSince, formatKoreanDate, isValidDateStr, todayStr } from "@/lib/dates";
 import { showAlert } from "@/lib/dialog";
-import { addPhotos, groupPhotos, loadPhotos } from "@/lib/photos";
+import { addPhotos, groupPhotos, loadPhotos, NO_LOCATION } from "@/lib/photos";
 import { getStartDate, setStartDate } from "@/lib/storage";
 import type { PhotoMemory } from "@/lib/types";
 
@@ -152,6 +152,14 @@ export default function HomeScreen() {
                   {isMulti ? (
                     <View style={styles.stackedBadge}>
                       <Ionicons name="copy" size={13} color="#ffffff" />
+                    </View>
+                  ) : null}
+                  {thumb.location && thumb.location !== NO_LOCATION ? (
+                    <View style={styles.locationBadge}>
+                      <Ionicons name="location" size={11} color="#ffffff" />
+                      <Text style={styles.locationText} numberOfLines={1}>
+                        {thumb.location}
+                      </Text>
                     </View>
                   ) : null}
                 </Pressable>
@@ -406,6 +414,25 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.55)",
     alignItems: "center",
     justifyContent: "center",
+  },
+  locationBadge: {
+    position: "absolute",
+    left: 5,
+    bottom: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    maxWidth: "88%",
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+  },
+  locationText: {
+    color: "#ffffff",
+    fontSize: 10,
+    fontWeight: "700",
+    flexShrink: 1,
   },
   modalBackdrop: {
     flex: 1,

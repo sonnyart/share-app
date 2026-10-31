@@ -3,6 +3,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import { Platform } from "react-native";
+import { gps as readGps } from "exifr/dist/mini.umd.js";
 
 import { supabase } from "@/lib/supabase";
 import type { PhotoGroup, PhotoMemory } from "@/lib/types";
@@ -58,16 +59,55 @@ function getPhotoDateFromExif(exif: any): string {
   return String(photoDate).split(" ")[0].replaceAll(":", ".");
 }
 
-function getGpsNumber(value: any): number | null {
-  if (typeof value === "number") {
-    return value;
+/** 위치 정보가 없을 때 표시할 문구 */
+export const NO_LOCATION = "위치 정보 없음";
+
+function formatCoord(latitude: number, longitude: number): string {
+  return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+}
+
+/** 웹에서는 expo-location reverseGeocodeAsync를 지원하지 않으므로 OSM(Nominatim)으로 대체 */
+async function reverseGeocodeWeb(
+  latitude: number,
+  longitude: number
+): Promise<string> {
+  const url =
+    "https://nominatim.openstreetmap.org/reverse" +
+    `?format=jsonv2&lat=${latitude}&lon=${longitude}&accept-language=ko`;
+
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+
+  if (!res.ok) {
+    throw new Error(`geocode ${res.status}`);
   }
 
-  if (Array.isArray(value) && value.length >= 3) {
-    return value[0] + value[1] / 60 + value[2] / 3600;
+  const data = await res.json();
+  const address = data?.address;
+
+  if (!address) {
+    throw new Error("no address");
   }
 
-  return null;
+  const city =
+    address.city ||
+    address.town ||
+    address.village ||
+    address.municipality ||
+    address.county;
+  const district = address.borough || address.suburb || address.district;
+  const place = [city, district].filter(Boolean).join(" ");
+
+  if (place) {
+    return place;
+  }
+
+  const region = [address.state, address.country].filter(Boolean).join(" ");
+
+  if (region) {
+    return region;
+  }
+
+  throw new Error("no place name");
 }
 
 async function reverseGeocodeText(
@@ -75,6 +115,10 @@ async function reverseGeocodeText(
   longitude: number
 ): Promise<string> {
   try {
+    if (Platform.OS === "web") {
+      return await reverseGeocodeWeb(latitude, longitude);
+    }
+
     const addresses = await Location.reverseGeocodeAsync({
       latitude,
       longitude,
@@ -83,36 +127,48 @@ async function reverseGeocodeText(
     const address = addresses[0];
 
     if (!address) {
-      return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      return formatCoord(latitude, longitude);
     }
 
     return (
       [address.city, address.district].filter(Boolean).join(" ") ||
       [address.region, address.country].filter(Boolean).join(" ") ||
-      `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
+      formatCoord(latitude, longitude)
     );
   } catch {
-    return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+    return formatCoord(latitude, longitude);
   }
 }
 
-/** EXIF GPS가 유효하면 장소명, 없거나 (0,0)이면 null */
-async function getPhotoLocationText(exif: any): Promise<string | null> {
-  const latitude = getGpsNumber(exif?.GPSLatitude);
-  const longitude = getGpsNumber(exif?.GPSLongitude);
+/** 사진 파일 바이트에서 EXIF GPS 좌표를 읽어 장소명으로. GPS가 없으면 null */
+async function getPhotoLocationText(
+  arrayBuffer: ArrayBuffer
+): Promise<string | null> {
+  let latitude: number;
+  let longitude: number;
 
-  if (latitude === null || longitude === null) {
+  try {
+    const result = await readGps(arrayBuffer);
+
+    if (
+      !result ||
+      typeof result.latitude !== "number" ||
+      typeof result.longitude !== "number"
+    ) {
+      return null;
+    }
+
+    latitude = result.latitude;
+    longitude = result.longitude;
+  } catch {
     return null;
   }
 
-  const fixedLatitude = exif?.GPSLatitudeRef === "S" ? -latitude : latitude;
-  const fixedLongitude = exif?.GPSLongitudeRef === "W" ? -longitude : longitude;
-
-  if (fixedLatitude === 0 && fixedLongitude === 0) {
+  if (latitude === 0 && longitude === 0) {
     return null;
   }
 
-  return reverseGeocodeText(fixedLatitude, fixedLongitude);
+  return reverseGeocodeText(latitude, longitude);
 }
 
 /** 사진에 GPS가 없을 때 기기 현재 위치를 장소명으로 (권한 거부/실패 시 null) */
@@ -207,9 +263,9 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
 
     const imageUrl = publicUrlData.publicUrl;
     const photoDate = getPhotoDateFromExif(asset.exif);
-    const exifLocation = await getPhotoLocationText(asset.exif);
+    const exifLocation = await getPhotoLocationText(arrayBuffer);
     const location =
-      exifLocation ?? (await getFallbackLocation()) ?? "위치 정보 없음";
+      exifLocation ?? (await getFallbackLocation()) ?? NO_LOCATION;
 
     const { data: inserted, error: insertError } = await supabase
       .from("photos")
@@ -272,9 +328,9 @@ export async function replacePhoto(photo: PhotoMemory): Promise<PhotoMemory | nu
 
   const imageUrl = publicUrlData.publicUrl;
   const photoDate = getPhotoDateFromExif(asset.exif);
-  const exifLocation = await getPhotoLocationText(asset.exif);
+  const exifLocation = await getPhotoLocationText(arrayBuffer);
   const location =
-    exifLocation ?? (await getDeviceLocationText()) ?? "위치 정보 없음";
+    exifLocation ?? (await getDeviceLocationText()) ?? NO_LOCATION;
 
   const { data: updated, error: updateError } = await supabase
     .from("photos")

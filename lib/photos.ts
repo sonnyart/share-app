@@ -70,36 +70,69 @@ function getGpsNumber(value: any): number | null {
   return null;
 }
 
-async function getPhotoLocationText(exif: any): Promise<string> {
-  const latitude = getGpsNumber(exif?.GPSLatitude);
-  const longitude = getGpsNumber(exif?.GPSLongitude);
-
-  if (latitude === null || longitude === null) {
-    return "위치 정보 없음";
-  }
-
-  const fixedLatitude = exif?.GPSLatitudeRef === "S" ? -latitude : latitude;
-  const fixedLongitude = exif?.GPSLongitudeRef === "W" ? -longitude : longitude;
-
+async function reverseGeocodeText(
+  latitude: number,
+  longitude: number
+): Promise<string> {
   try {
     const addresses = await Location.reverseGeocodeAsync({
-      latitude: fixedLatitude,
-      longitude: fixedLongitude,
+      latitude,
+      longitude,
     });
 
     const address = addresses[0];
 
     if (!address) {
-      return `${fixedLatitude.toFixed(4)}, ${fixedLongitude.toFixed(4)}`;
+      return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
     }
 
     return (
       [address.city, address.district].filter(Boolean).join(" ") ||
       [address.region, address.country].filter(Boolean).join(" ") ||
-      `${fixedLatitude.toFixed(4)}, ${fixedLongitude.toFixed(4)}`
+      `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`
     );
   } catch {
-    return `${fixedLatitude.toFixed(4)}, ${fixedLongitude.toFixed(4)}`;
+    return `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+  }
+}
+
+/** EXIF GPS가 유효하면 장소명, 없거나 (0,0)이면 null */
+async function getPhotoLocationText(exif: any): Promise<string | null> {
+  const latitude = getGpsNumber(exif?.GPSLatitude);
+  const longitude = getGpsNumber(exif?.GPSLongitude);
+
+  if (latitude === null || longitude === null) {
+    return null;
+  }
+
+  const fixedLatitude = exif?.GPSLatitudeRef === "S" ? -latitude : latitude;
+  const fixedLongitude = exif?.GPSLongitudeRef === "W" ? -longitude : longitude;
+
+  if (fixedLatitude === 0 && fixedLongitude === 0) {
+    return null;
+  }
+
+  return reverseGeocodeText(fixedLatitude, fixedLongitude);
+}
+
+/** 사진에 GPS가 없을 때 기기 현재 위치를 장소명으로 (권한 거부/실패 시 null) */
+async function getDeviceLocationText(): Promise<string | null> {
+  try {
+    const permission = await Location.requestForegroundPermissionsAsync();
+    if (permission.status !== "granted") {
+      return null;
+    }
+
+    const position = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+
+    return reverseGeocodeText(
+      position.coords.latitude,
+      position.coords.longitude
+    );
+  } catch {
+    return null;
   }
 }
 
@@ -142,6 +175,15 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
   const groupId = genId();
   const added: PhotoMemory[] = [];
 
+  // 사진에 GPS가 없을 때 쓸 기기 현재 위치 (필요할 때 한 번만 조회)
+  let fallbackLocation: string | null | undefined;
+  async function getFallbackLocation() {
+    if (fallbackLocation === undefined) {
+      fallbackLocation = await getDeviceLocationText();
+    }
+    return fallbackLocation;
+  }
+
   for (let i = 0; i < assets.length; i++) {
     const asset = assets[i];
 
@@ -165,7 +207,9 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
 
     const imageUrl = publicUrlData.publicUrl;
     const photoDate = getPhotoDateFromExif(asset.exif);
-    const location = await getPhotoLocationText(asset.exif);
+    const exifLocation = await getPhotoLocationText(asset.exif);
+    const location =
+      exifLocation ?? (await getFallbackLocation()) ?? "위치 정보 없음";
 
     const { data: inserted, error: insertError } = await supabase
       .from("photos")
@@ -228,7 +272,9 @@ export async function replacePhoto(photo: PhotoMemory): Promise<PhotoMemory | nu
 
   const imageUrl = publicUrlData.publicUrl;
   const photoDate = getPhotoDateFromExif(asset.exif);
-  const location = await getPhotoLocationText(asset.exif);
+  const exifLocation = await getPhotoLocationText(asset.exif);
+  const location =
+    exifLocation ?? (await getDeviceLocationText()) ?? "위치 정보 없음";
 
   const { data: updated, error: updateError } = await supabase
     .from("photos")

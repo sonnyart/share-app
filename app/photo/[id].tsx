@@ -38,7 +38,13 @@ function computePhotoRect(
   cellW: number,
   cellH: number
 ) {
-  if (!size || size.w <= 0 || size.h <= 0) {
+  if (
+    !size ||
+    !Number.isFinite(size.w) ||
+    !Number.isFinite(size.h) ||
+    size.w <= 0 ||
+    size.h <= 0
+  ) {
     return { left: 0, top: 0, right: cellW, bottom: cellH };
   }
 
@@ -71,6 +77,9 @@ export default function PhotoDetailScreen() {
   );
 
   const handleImageSize = useCallback((photoId: string, w: number, h: number) => {
+    if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+      return;
+    }
     setImageSizes((prev) => {
       const existing = prev[photoId];
       if (existing && existing.w === w && existing.h === h) {

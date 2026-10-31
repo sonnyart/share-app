@@ -113,6 +113,7 @@ export default function CalendarScreen() {
         </View>
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={[
             ...(upcoming.length > 0
               ? [{ key: "upcoming-header", header: true as const }, ...upcoming]

@@ -111,6 +111,8 @@ export default function HomeScreen() {
         <ScrollView
           style={styles.list}
           contentContainerStyle={styles.scrollContent}
+          overScrollMode="always"
+          alwaysBounceVertical
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -377,6 +379,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   scrollContent: {
+    flexGrow: 1,
     paddingBottom: 32,
   },
   grid: {

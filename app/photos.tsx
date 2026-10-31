@@ -108,6 +108,7 @@ export default function PhotosScreen() {
         </View>
       ) : (
         <FlatList
+          style={{ flex: 1 }}
           data={groupPhotos(photos)}
           keyExtractor={(item) => item.key}
           numColumns={3}

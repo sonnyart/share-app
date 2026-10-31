@@ -181,6 +181,7 @@ export default function WishScreen() {
             </Text>
           ) : null}
           <FlatList
+            style={{ flex: 1 }}
             data={wishes}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContent}

@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   },
   locationBadge: {
     position: "absolute",
-    left: 5,
+    right: 5,
     bottom: 5,
     flexDirection: "row",
     alignItems: "center",

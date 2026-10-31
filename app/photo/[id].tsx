@@ -458,7 +458,7 @@ function ZoomablePhoto({
   onImageSize?: (w: number, h: number) => void;
 }) {
   const [zoomed, setZoomed] = useState(false);
-  const { height: cellHeight } = Dimensions.get("window");
+  const { width: cellWidth, height: cellHeight } = Dimensions.get("window");
 
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
@@ -552,7 +552,7 @@ function ZoomablePhoto({
         style={[
           styles.locationBadge,
           {
-            left: photoRect.left + 16,
+            right: cellWidth - photoRect.right + 16,
             bottom: cellHeight - photoRect.bottom + 24,
           },
         ]}>
@@ -587,7 +587,7 @@ const styles = StyleSheet.create({
   },
   locationBadge: {
     position: "absolute",
-    alignItems: "flex-start",
+    alignItems: "flex-end",
     backgroundColor: "rgba(0, 0, 0, 0.45)",
     borderRadius: 10,
     paddingVertical: 6,

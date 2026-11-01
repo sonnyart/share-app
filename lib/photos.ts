@@ -170,27 +170,6 @@ async function getPhotoLocationText(exif: any): Promise<string | null> {
   return reverseGeocodeText(fixedLatitude, fixedLongitude);
 }
 
-/** 사진에 GPS가 없을 때 기기 현재 위치를 장소명으로 (권한 거부/실패 시 null) */
-async function getDeviceLocationText(): Promise<string | null> {
-  try {
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (permission.status !== "granted") {
-      return null;
-    }
-
-    const position = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
-    });
-
-    return reverseGeocodeText(
-      position.coords.latitude,
-      position.coords.longitude
-    );
-  } catch {
-    return null;
-  }
-}
-
 /** 웹/네이티브 공통으로 파일을 ArrayBuffer로 읽기 (웹은 fetch, 네이티브는 FileSystem) */
 async function readFileAsArrayBuffer(uri: string): Promise<ArrayBuffer> {
   if (Platform.OS === "web") {
@@ -230,15 +209,6 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
   const groupId = genId();
   const added: PhotoMemory[] = [];
 
-  // 사진에 GPS가 없을 때 쓸 기기 현재 위치 (필요할 때 한 번만 조회)
-  let fallbackLocation: string | null | undefined;
-  async function getFallbackLocation() {
-    if (fallbackLocation === undefined) {
-      fallbackLocation = await getDeviceLocationText();
-    }
-    return fallbackLocation;
-  }
-
   for (let i = 0; i < assets.length; i++) {
     const asset = assets[i];
 
@@ -263,8 +233,7 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
     const imageUrl = publicUrlData.publicUrl;
     const photoDate = getPhotoDateFromExif(asset.exif);
     const exifLocation = await getPhotoLocationText(asset.exif);
-    const location =
-      exifLocation ?? (await getFallbackLocation()) ?? NO_LOCATION;
+    const location = exifLocation ?? NO_LOCATION;
 
     const { data: inserted, error: insertError } = await supabase
       .from("photos")
@@ -328,8 +297,7 @@ export async function replacePhoto(photo: PhotoMemory): Promise<PhotoMemory | nu
   const imageUrl = publicUrlData.publicUrl;
   const photoDate = getPhotoDateFromExif(asset.exif);
   const exifLocation = await getPhotoLocationText(asset.exif);
-  const location =
-    exifLocation ?? (await getDeviceLocationText()) ?? NO_LOCATION;
+  const location = exifLocation ?? NO_LOCATION;
 
   const { data: updated, error: updateError } = await supabase
     .from("photos")

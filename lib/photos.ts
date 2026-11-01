@@ -151,23 +151,63 @@ function getGpsNumber(value: any): number | null {
   return null;
 }
 
-/** EXIF GPS 좌표를 읽어 장소명으로. GPS가 없거나 (0,0)이면 null */
-async function getPhotoLocationText(exif: any): Promise<string | null> {
-  const latitude = getGpsNumber(exif?.GPSLatitude);
-  const longitude = getGpsNumber(exif?.GPSLongitude);
+/** 웹에서 파일 바이트의 EXIF GPS를 읽기. exifr을 동적 import 하므로 네이티브에서는 로드되지 않음 */
+async function readGpsFromFile(
+  arrayBuffer: ArrayBuffer
+): Promise<{ latitude: number; longitude: number } | null> {
+  try {
+    const mod: any = await import("exifr");
+    const gpsFn = mod.gps ?? mod.default?.gps;
+    if (typeof gpsFn !== "function") {
+      return null;
+    }
+
+    const result = await gpsFn(arrayBuffer);
+    if (
+      !result ||
+      typeof result.latitude !== "number" ||
+      typeof result.longitude !== "number"
+    ) {
+      return null;
+    }
+
+    return { latitude: result.latitude, longitude: result.longitude };
+  } catch {
+    return null;
+  }
+}
+
+/** 사진 GPS 좌표를 장소명으로. 네이티브는 asset.exif, 웹은 파일 바이트(exifr). GPS 없거나 (0,0)이면 null */
+async function getPhotoLocationText(
+  exif: any,
+  arrayBuffer: ArrayBuffer
+): Promise<string | null> {
+  let latitude: number | null;
+  let longitude: number | null;
+
+  if (Platform.OS === "web") {
+    const gps = await readGpsFromFile(arrayBuffer);
+    latitude = gps?.latitude ?? null;
+    longitude = gps?.longitude ?? null;
+  } else {
+    latitude = getGpsNumber(exif?.GPSLatitude);
+    longitude = getGpsNumber(exif?.GPSLongitude);
+
+    if (latitude !== null && longitude !== null) {
+      latitude = exif?.GPSLatitudeRef === "S" ? -latitude : latitude;
+      longitude = exif?.GPSLongitudeRef === "W" ? -longitude : longitude;
+    }
+  }
 
   if (latitude === null || longitude === null) {
     return null;
   }
 
-  const fixedLatitude = exif?.GPSLatitudeRef === "S" ? -latitude : latitude;
-  const fixedLongitude = exif?.GPSLongitudeRef === "W" ? -longitude : longitude;
-
-  if (fixedLatitude === 0 && fixedLongitude === 0) {
+  if (latitude === 0 && longitude === 0) {
     return null;
   }
 
-  return reverseGeocodeText(fixedLatitude, fixedLongitude);
+  return reverseGeocodeText(latitude, longitude);
 }
 
 /** 웹/네이티브 공통으로 파일을 ArrayBuffer로 읽기 (웹은 fetch, 네이티브는 FileSystem) */
@@ -232,7 +272,7 @@ export async function addPhotos(): Promise<PhotoMemory[]> {
 
     const imageUrl = publicUrlData.publicUrl;
     const photoDate = getPhotoDateFromExif(asset.exif);
-    const exifLocation = await getPhotoLocationText(asset.exif);
+    const exifLocation = await getPhotoLocationText(asset.exif, arrayBuffer);
     const location = exifLocation ?? NO_LOCATION;
 
     const { data: inserted, error: insertError } = await supabase
@@ -296,7 +336,7 @@ export async function replacePhoto(photo: PhotoMemory): Promise<PhotoMemory | nu
 
   const imageUrl = publicUrlData.publicUrl;
   const photoDate = getPhotoDateFromExif(asset.exif);
-  const exifLocation = await getPhotoLocationText(asset.exif);
+  const exifLocation = await getPhotoLocationText(asset.exif, arrayBuffer);
   const location = exifLocation ?? NO_LOCATION;
 
   const { data: updated, error: updateError } = await supabase
